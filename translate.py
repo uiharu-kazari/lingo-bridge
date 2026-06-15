@@ -231,10 +231,37 @@ def build_layers(decomp: dict, src: str, tgt: str) -> dict:
     }
 
 
+def _remote_translate(text: str, src: str, tgt: str) -> dict:
+    """Proxy the whole translation to a deployed (Modal) instance — no local
+    model. Layer-building happens there too, so the result is identical.
+    Retries once to absorb the deployed container's cold-start blip."""
+    import json
+    import time
+    import urllib.request
+    base = llm.REMOTE.rstrip("/")
+    payload = json.dumps({"text": text, "source": src, "target": tgt}).encode("utf-8")
+    last = None
+    for attempt in range(2):
+        try:
+            req = urllib.request.Request(
+                base + "/api/translate", data=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=300) as r:  # cold start slow
+                return json.load(r)
+        except Exception as e:
+            last = e
+            if attempt == 0:
+                time.sleep(4)
+    raise last
+
+
 def progressive_translate(text: str, src: str, tgt: str) -> dict:
     text = _clean(text)
     if not text:
         raise ValueError("empty input")
+    if llm.REMOTE:
+        return _remote_translate(text, src, tgt)
     if llm.backend() == "llama":
         try:
             decomp = _decompose(text, src, tgt)

@@ -5,17 +5,26 @@ frontend) works even before the model has been downloaded/compiled.
 """
 from __future__ import annotations
 import json
+import os
 import threading
 import config
 
+# When LINGO_REMOTE_URL is set, ALL model work is proxied to a deployed (Modal)
+# instance — no model is ever loaded on this machine.
+REMOTE = os.environ.get("LINGO_REMOTE_URL", "").strip()
+
 _llm = None
-_backend = None  # "llama" | "mock"
+_backend = None  # "remote" | "llama" | "mock"
 _lock = threading.Lock()  # llama.cpp is not safe under concurrent calls
 
 
 def _load():
     global _llm, _backend
     if _backend is not None:
+        return
+    if REMOTE:
+        _backend = "remote"
+        print(f"[llm] proxying translation to {REMOTE} (no local model)")
         return
     if config.LLM_PATH.exists():
         try:

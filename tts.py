@@ -1,8 +1,15 @@
-"""Text-to-speech for each translation layer.
+"""Text-to-speech for each translation layer — OpenBMB VoxCPM2.
 
-Default engine: Kokoro-82M via onnxruntime (Apache-2.0, multilingual, runs on
-CPU/Apple-Silicon with no GPU). A Qwen3-TTS adapter slot is documented but
-disabled because Qwen3-TTS-0.6B ships CUDA-only inference with no MPS path.
+Engines (set via TTS_ENGINE):
+  * "voxcpm" — openbmb/VoxCPM2 via the `voxcpm` package (needs an NVIDIA GPU).
+               The real engine on a GPU deployment (Modal / GPU Space). 30
+               languages, no language tag needed (ideal for hybrid layers).
+  * "remote" — proxy /api/tts to a deployed instance, so a GPU-less machine
+               (local dev / CPU Space) uses the exact same audio.
+A short beep is the only last-resort fallback if neither is available.
+
+For a CONSISTENT narration voice across clips, set VOXCPM_REF_WAV to one fixed
+reference clip (else VoxCPM2 may vary the voice between calls).
 
 Audio is written to audio_cache/ and addressed by a content hash so repeated
 requests are instant.
@@ -10,68 +17,46 @@ requests are instant.
 from __future__ import annotations
 import hashlib
 import os
-import wave
 import struct
+import wave
+
 import config
 
-# Engine selection. Default "kokoro" (runs anywhere, incl. Apple Silicon).
-# TTS_ENGINE=qwen3 uses Qwen3-TTS-12Hz-1.7B-CustomVoice via `qwen-tts` (needs an
-# NVIDIA GPU); it falls back to Kokoro if it can't load.
-ENGINE = os.environ.get("TTS_ENGINE", "kokoro").lower()
+# Default to the real model; use TTS_ENGINE=remote on a GPU-less machine.
+ENGINE = os.environ.get("TTS_ENGINE", "voxcpm").lower()
+VOXCPM_REPO = os.environ.get("VOXCPM_REPO", "openbmb/VoxCPM2")
+VOXCPM_REF = os.environ.get("VOXCPM_REF_WAV", "")  # fixed reference for one voice
 
-_kokoro = None
-_qwen3 = None
-_backend = None  # "kokoro" | "qwen3" | "beep"
+_voxcpm = None
+_anchor = None   # one fixed reference clip -> consistent narrator voice
+_backend = None  # "voxcpm" | "remote" | "beep"
 
 
 def _load():
-    global _kokoro, _qwen3, _backend
+    global _voxcpm, _backend
     if _backend is not None:
         return
     if ENGINE == "remote":
         _backend = "remote"
         print(f"[tts] proxying TTS to {config.TTS_REMOTE_URL}")
         return
-    if ENGINE == "qwen3":
+    if ENGINE == "voxcpm":
         try:                                    # pragma: no cover (needs CUDA)
-            import torch
-            from qwen_tts import Qwen3TTSModel
-            src = (str(config.QWEN3_TTS_DIR)
-                   if config.QWEN3_TTS_DIR.exists() else config.QWEN3_TTS_REPO)
-            _qwen3 = Qwen3TTSModel.from_pretrained(
-                src, device_map="cuda:0", dtype=torch.bfloat16,
-                attn_implementation=config.QWEN3_ATTN,
-            )
-            _backend = "qwen3"
-            print(f"[tts] loaded Qwen3-TTS CustomVoice ({config.QWEN3_ATTN}) "
-                  f"speaker={config.QWEN3_SPEAKER}")
+            from voxcpm import VoxCPM
+            _voxcpm = VoxCPM.from_pretrained(VOXCPM_REPO, load_denoiser=False)
+            _backend = "voxcpm"
+            print(f"[tts] loaded {VOXCPM_REPO}"
+                  + (f" (ref voice {VOXCPM_REF})" if VOXCPM_REF else ""))
             return
         except Exception as e:                  # pragma: no cover
-            print(f"[tts] Qwen3-TTS unavailable ({e}); falling back to Kokoro")
-    if config.KOKORO_MODEL.exists() and config.KOKORO_VOICES.exists():
-        try:
-            from kokoro_onnx import Kokoro
-            _kokoro = Kokoro(str(config.KOKORO_MODEL), str(config.KOKORO_VOICES))
-            _backend = "kokoro"
-            print("[tts] loaded Kokoro-82M (onnxruntime)")
-            return
-        except Exception as e:  # pragma: no cover
-            print(f"[tts] kokoro load failed ({e}); using beep fallback")
-    else:
-        print("[tts] kokoro assets missing; using beep fallback")
+            print(f"[tts] VoxCPM2 unavailable ({e}); beep fallback "
+                  "(set TTS_ENGINE=remote to use a deployed GPU instance)")
     _backend = "beep"
 
 
 def backend() -> str:
     _load()
     return _backend
-
-
-def _voice_for(lang_name: str):
-    _, lang_code, voice = config.LANGUAGES.get(
-        lang_name, ("en", "en-us", config.DEFAULT_VOICE)
-    )
-    return lang_code, voice
 
 
 def _cache_path(text: str, lang_name: str) -> "config.Path":
@@ -96,32 +81,48 @@ def synthesize(text: str, lang_name: str) -> str:
         except Exception as e:
             print(f"[tts] remote synth failed ({e}); uncached beep")
             return _fail_beep()
-    if _backend == "qwen3":  # pragma: no cover (needs CUDA)
+    if _backend == "voxcpm":  # pragma: no cover (needs CUDA)
         try:
-            # Layers are hybrid (mixed source+target text), so let the model
-            # auto-detect language per phrase rather than forcing one.
-            wavs, sr = _qwen3.generate_custom_voice(
-                text=text, language="Auto", speaker=config.QWEN3_SPEAKER,
-            )
-            _write_wav(path, wavs[0], sr)
+            # No language tag — VoxCPM2 reads mixed-language text directly,
+            # which suits the hybrid layers. Reuse one anchor clip so every
+            # layer shares the same narrator voice.
+            ref = VOXCPM_REF or _ensure_anchor()
+            try:
+                kwargs = {"text": text, "cfg_value": 2.0, "inference_timesteps": 10}
+                if ref:
+                    kwargs["reference_wav_path"] = ref
+                wav = _voxcpm.generate(**kwargs)
+            except TypeError:  # this voxcpm build lacks reference_wav_path
+                wav = _voxcpm.generate(text=text, cfg_value=2.0, inference_timesteps=10)
+            _write_wav(path, wav, _voxcpm.tts_model.sample_rate)
             return str(path)
         except Exception as e:
-            print(f"[tts] qwen3 synth failed ({e}); uncached beep")
+            print(f"[tts] voxcpm synth failed ({e}); uncached beep")
             return _fail_beep()
-    if _backend == "kokoro":
-        lang_code, voice = _voice_for(lang_name)
-        if voice:  # Kokoro has no voice for German/Russian/Korean yet
-            try:
-                samples, sr = _kokoro.create(text, voice=voice, speed=1.0, lang=lang_code)
-                _write_wav(path, samples, sr)
-                return str(path)
-            except Exception as e:  # pragma: no cover
-                print(f"[tts] kokoro synth failed ({e}); uncached beep")
-                return _fail_beep()
-    # No engine for this language (e.g. Kokoro lacks the voice): deterministic
-    # fallback, safe to cache.
     _write_beep(path)
     return str(path)
+
+
+def _ensure_anchor():
+    """Generate one anchor clip once and reuse it as the reference voice, so all
+    layers of an example sound like the same narrator. Returns a path or None."""
+    global _anchor
+    if _anchor:
+        return _anchor
+    try:
+        config.AUDIO_CACHE.mkdir(exist_ok=True)
+        p = config.AUDIO_CACHE / "_voxcpm_anchor.wav"
+        if not p.exists():
+            wav = _voxcpm.generate(
+                text="This is the narrator voice for the demonstration.",
+                cfg_value=2.0, inference_timesteps=10,
+            )
+            _write_wav(p, wav, _voxcpm.tts_model.sample_rate)
+        _anchor = str(p)
+        return _anchor
+    except Exception as e:
+        print(f"[tts] voxcpm anchor failed ({e}); default voice")
+        return None
 
 
 def _fail_beep():
@@ -201,5 +202,3 @@ def _write_beep(path, sr=24000, secs=0.4, freq=440.0):
 
 if __name__ == "__main__":
     print("backend:", backend())
-    p = synthesize("El gato se sentó en el tapete", "Spanish")
-    print("wrote", p)

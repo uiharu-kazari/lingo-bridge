@@ -4,19 +4,19 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent
 # MODELS_DIR / AUDIO_CACHE can be redirected via env (e.g. a Modal Volume).
-MODELS_DIR = Path(os.environ.get("LINGUA_MODELS_DIR", ROOT / "models"))
-AUDIO_CACHE = Path(os.environ.get("LINGUA_AUDIO_DIR", ROOT / "audio_cache"))
-STATIC_DIR = Path(os.environ.get("LINGUA_STATIC_DIR", ROOT / "static"))
+MODELS_DIR = Path(os.environ.get("LINGO_MODELS_DIR", ROOT / "models"))
+AUDIO_CACHE = Path(os.environ.get("LINGO_AUDIO_DIR", ROOT / "audio_cache"))
+STATIC_DIR = Path(os.environ.get("LINGO_STATIC_DIR", ROOT / "static"))
 
 # ---- Text model (llama.cpp / GGUF) -----------------------------------------
 # Override repo/file via env so the same code can serve a smaller model on a
 # CPU deployment (Modal) and the 3B locally on Metal.
-LLM_REPO = os.environ.get("LINGUA_LLM_REPO", "unsloth/Qwen3-4B-Instruct-2507-GGUF")
-LLM_FILE = os.environ.get("LINGUA_LLM_FILE", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
+LLM_REPO = os.environ.get("LINGO_LLM_REPO", "unsloth/Qwen3-4B-Instruct-2507-GGUF")
+LLM_FILE = os.environ.get("LINGO_LLM_FILE", "Qwen3-4B-Instruct-2507-Q4_K_M.gguf")
 LLM_PATH = MODELS_DIR / LLM_FILE
 LLM_CTX = 4096
-LLM_THREADS = int(os.environ.get("LINGUA_LLM_THREADS", "6"))
-LLM_GPU_LAYERS = int(os.environ.get("LINGUA_GPU_LAYERS", "-1"))  # -1=all (Metal/CUDA), 0=CPU
+LLM_THREADS = int(os.environ.get("LINGO_LLM_THREADS", "6"))
+LLM_GPU_LAYERS = int(os.environ.get("LINGO_GPU_LAYERS", "-1"))  # -1=all (Metal/CUDA), 0=CPU
 
 # ---- TTS: Qwen3-TTS (target, GPU) — engine selected by TTS_ENGINE env -------
 # TTS_ENGINE=qwen3 uses Qwen3-TTS-12Hz-1.7B-CustomVoice (preset speakers, 10
@@ -29,7 +29,7 @@ QWEN3_ATTN = os.environ.get("QWEN3_ATTN", "sdpa")        # sdpa | flash_attentio
 # TTS_ENGINE=remote proxies /api/tts to a deployed instance (so a GPU-less
 # machine can use the same Qwen3-TTS audio as production while developing).
 TTS_REMOTE_URL = os.environ.get(
-    "LINGUA_TTS_REMOTE_URL", "https://uiharu-kazari--lingua-stack-web.modal.run"
+    "LINGO_TTS_REMOTE_URL", "https://uiharu-kazari--lingo-bridge-web.modal.run"
 )
 
 # ---- TTS: Kokoro-82M via onnxruntime (interim / fallback) -------------------
