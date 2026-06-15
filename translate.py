@@ -87,7 +87,7 @@ def _validate(data: dict, text: str, tgt: str) -> dict:
     final = _clean(data.get("final", "")) or " ".join(
         clean[i]["target"] for i in ranked
     )
-    return {"final": final, "units": clean}
+    return {"final": final, "units": clean, "source_text": _clean(text)}
 
 
 # ----------------------------------------------------------------------------
@@ -115,7 +115,7 @@ def _mock_decompose(text: str, src: str, tgt: str) -> dict:
             {"source": w, "target": tgt_w or w, "type": typ, "order_target": i}
         )
     final = " ".join(u["target"] for u in units)
-    return {"final": final, "units": units}
+    return {"final": final, "units": units, "source_text": text}
 
 
 # ----------------------------------------------------------------------------
@@ -126,10 +126,33 @@ def _flip_layer(unit_type: str) -> int:
     return config.FLIP_SCHEDULE.get(unit_type, config.FLIP_SCHEDULE["other"])
 
 
+def _occurrence_order(units, field, full_text, fallback):
+    """Order unit indices by where each phrase actually appears in `full_text`,
+    so the endpoint layers read as real, grammatical sentences. Phrases that
+    aren't found fall back to the LLM-provided order, after the found ones."""
+    full = (full_text or "").lower()
+    pos = []
+    for u in units:
+        phrase = (u.get(field) or "").lower().strip()
+        pos.append(full.find(phrase) if phrase else -1)
+    return sorted(
+        range(len(units)),
+        key=lambda i: (pos[i], i) if pos[i] >= 0 else (10**9 + fallback(i), i),
+    )
+
+
 def build_layers(decomp: dict, src: str, tgt: str) -> dict:
     units = decomp["units"]
     n = len(units)
-    target_order = sorted(range(n), key=lambda i: units[i]["order_target"])
+    # Beginning must read as the source sentence; end as the natural target
+    # sentence. Derive both from the actual sentences rather than trusting the
+    # order the model listed phrases in. The middle is free to rearrange.
+    source_order = _occurrence_order(
+        units, "source", decomp.get("source_text", ""), lambda i: i
+    )
+    target_order = _occurrence_order(
+        units, "target", decomp.get("final", ""), lambda i: units[i]["order_target"]
+    )
 
     layers = []
     for L, label in enumerate(config.LAYER_LABELS):
@@ -137,7 +160,7 @@ def build_layers(decomp: dict, src: str, tgt: str) -> dict:
         if L >= config.REORDER_AT:
             order = target_order
         else:
-            order = list(range(n))
+            order = source_order
 
         chunks = []
         for pos, ui in enumerate(order):
@@ -174,7 +197,9 @@ def build_layers(decomp: dict, src: str, tgt: str) -> dict:
             }
         )
 
-    # Final layer text uses the model's natural sentence.
+    # Endpoint layers speak the exact source / natural-target sentences.
+    if decomp.get("source_text"):
+        layers[0]["text"] = decomp["source_text"]
     layers[-1]["text"] = decomp["final"]
 
     # Links: same unit across adjacent layers.
