@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { mixRGB } from "/static/app.js?v=18";
+import { mixRGB } from "/static/app.js?v=19";
 
 const col = (mix) => {
   const [r, g, b] = mixRGB(mix);
@@ -615,7 +615,8 @@ export class CardsView {
   _frameCamera(n) {
     const depth = (n - 1) * LAYER_GAP;
     // Radial distance and angled framing (theta3D = 60 degrees from vertical Z)
-    this.camRadius = Math.max(15, depth * 0.46 + 11.0);
+    // Pull out default viewing position a bit more
+    this.camRadius = Math.max(18.5, depth * 0.55 + 13.5);
     this.targetCamRadius = this.camRadius;
     this.theta3D = 1.05;
     this.currentTheta = 0; // Reset rotation on new load
@@ -710,8 +711,9 @@ export class CardsView {
 
   _getRadii() {
     const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
-    const minRadius = Math.max(4.0, depth * 0.15 + 2.0);
-    const maxRadius = Math.max(28.0, depth * 0.54 + 13.0);
+    // Allow zooming in much closer (minRadius smaller) and pulling out further (maxRadius larger)
+    const minRadius = Math.max(2.0, depth * 0.08 + 1.0);
+    const maxRadius = Math.max(38.0, depth * 0.68 + 16.0);
     return { minRadius, maxRadius };
   }
 

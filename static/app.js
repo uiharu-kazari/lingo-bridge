@@ -1,4 +1,4 @@
-import { CardsView } from "/static/view3d.js?v=18";
+import { CardsView } from "/static/view3d.js?v=19";
 
 // ---- shared colour helpers (purple -> cyan) --------------------------------
 export const SRC_RGB = [168, 85, 247];
