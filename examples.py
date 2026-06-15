@@ -12,27 +12,20 @@ try:
 except Exception:  # cache not generated yet
     _CACHE = {}
 
+# Curated set — one per language, chosen to show reordering + phrase types.
+# Decompositions are authored by a large model (see build_examples.py), not the
+# small on-device model, so the examples are reliably correct.
 EXAMPLES = [
-    # adjective reorder -> crossing ribbons
     ("The small red car drove quickly yesterday", "English", "French"),
-    # SOV reorder: verb jumps to the end, time word to the front
-    ("I read a book about history yesterday", "English", "Japanese"),
-    # rich time + place + action
     ("Every morning she drinks hot coffee in the garden", "English", "Spanish"),
     ("The old man told a beautiful story to the children", "English", "Italian"),
     ("They traveled to the mountains during the summer", "English", "Portuguese"),
-    ("She sings a beautiful song every evening", "English", "Hindi"),
-    ("We will meet our friends at the station tomorrow", "English", "French"),
-    ("The quiet teacher explained the difficult lesson patiently", "English", "Spanish"),
-    # newer Qwen3-TTS languages
     ("She will visit her grandmother next weekend", "English", "German"),
-    ("We are learning three new languages together", "English", "Korean"),
     ("The scientist explained her discovery very clearly", "English", "Russian"),
-    # non-English sources
+    ("We are learning three new languages together", "English", "Korean"),
+    ("I read a book about history yesterday", "English", "Japanese"),
     ("我每天早上喝一杯热咖啡", "Chinese", "English"),
     ("Le petit chat noir dort sur le vieux canapé", "French", "English"),
-    ("私は昨日友達と公園で遊びました", "Japanese", "English"),
-    ("Mi hermana cocina una cena deliciosa los domingos", "Spanish", "English"),
 ]
 
 

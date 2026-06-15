@@ -1,0 +1,92 @@
+{
+  "English|French|The small red car drove quickly yesterday": {
+    "final": "La petite voiture rouge a roulé rapidement hier",
+    "units": [
+      {"source": "The small red car", "target": "La petite voiture rouge", "type": "concept", "order_target": 0},
+      {"source": "drove", "target": "a roulé", "type": "action", "order_target": 1},
+      {"source": "quickly", "target": "rapidement", "type": "other", "order_target": 2},
+      {"source": "yesterday", "target": "hier", "type": "time", "order_target": 3}
+    ]
+  },
+  "English|Spanish|Every morning she drinks hot coffee in the garden": {
+    "final": "Todas las mañanas ella bebe café caliente en el jardín",
+    "units": [
+      {"source": "Every morning", "target": "Todas las mañanas", "type": "time", "order_target": 0},
+      {"source": "she drinks", "target": "ella bebe", "type": "action", "order_target": 1},
+      {"source": "hot coffee", "target": "café caliente", "type": "concept", "order_target": 2},
+      {"source": "in the garden", "target": "en el jardín", "type": "other", "order_target": 3}
+    ]
+  },
+  "English|Italian|The old man told a beautiful story to the children": {
+    "final": "Il vecchio raccontò una bella storia ai bambini",
+    "units": [
+      {"source": "The old man", "target": "Il vecchio", "type": "concept", "order_target": 0},
+      {"source": "told", "target": "raccontò", "type": "action", "order_target": 1},
+      {"source": "a beautiful story", "target": "una bella storia", "type": "concept", "order_target": 2},
+      {"source": "to the children", "target": "ai bambini", "type": "other", "order_target": 3}
+    ]
+  },
+  "English|Portuguese|They traveled to the mountains during the summer": {
+    "final": "Eles viajaram para as montanhas durante o verão",
+    "units": [
+      {"source": "They traveled", "target": "Eles viajaram", "type": "action", "order_target": 0},
+      {"source": "to the mountains", "target": "para as montanhas", "type": "concept", "order_target": 1},
+      {"source": "during the summer", "target": "durante o verão", "type": "time", "order_target": 2}
+    ]
+  },
+  "English|German|She will visit her grandmother next weekend": {
+    "final": "Sie wird ihre Großmutter nächstes Wochenende besuchen",
+    "units": [
+      {"source": "She will", "target": "Sie wird", "type": "action", "order_target": 0},
+      {"source": "visit", "target": "besuchen", "type": "action", "order_target": 3},
+      {"source": "her grandmother", "target": "ihre Großmutter", "type": "concept", "order_target": 1},
+      {"source": "next weekend", "target": "nächstes Wochenende", "type": "time", "order_target": 2}
+    ]
+  },
+  "English|Russian|The scientist explained her discovery very clearly": {
+    "final": "Учёная очень понятно объяснила своё открытие",
+    "units": [
+      {"source": "The scientist", "target": "Учёная", "type": "concept", "order_target": 0},
+      {"source": "explained", "target": "объяснила", "type": "action", "order_target": 2},
+      {"source": "her discovery", "target": "своё открытие", "type": "concept", "order_target": 3},
+      {"source": "very clearly", "target": "очень понятно", "type": "other", "order_target": 1}
+    ]
+  },
+  "English|Korean|We are learning three new languages together": {
+    "final": "우리는 함께 세 개의 새로운 언어를 배우고 있습니다",
+    "units": [
+      {"source": "We", "target": "우리는", "type": "concept", "order_target": 0},
+      {"source": "are learning", "target": "배우고 있습니다", "type": "action", "order_target": 3},
+      {"source": "three new languages", "target": "세 개의 새로운 언어를", "type": "concept", "order_target": 2},
+      {"source": "together", "target": "함께", "type": "other", "order_target": 1}
+    ]
+  },
+  "English|Japanese|I read a book about history yesterday": {
+    "final": "私は昨日歴史についての本を読みました",
+    "units": [
+      {"source": "I", "target": "私は", "type": "concept", "order_target": 0},
+      {"source": "read", "target": "読みました", "type": "action", "order_target": 3},
+      {"source": "a book about history", "target": "歴史についての本を", "type": "concept", "order_target": 2},
+      {"source": "yesterday", "target": "昨日", "type": "time", "order_target": 1}
+    ]
+  },
+  "Chinese|English|我每天早上喝一杯热咖啡": {
+    "final": "Every morning I drink a cup of hot coffee",
+    "units": [
+      {"source": "我", "target": "I", "type": "concept", "order_target": 1},
+      {"source": "每天早上", "target": "Every morning", "type": "time", "order_target": 0},
+      {"source": "喝", "target": "drink", "type": "action", "order_target": 2},
+      {"source": "一杯", "target": "a cup of", "type": "concept", "order_target": 3},
+      {"source": "热咖啡", "target": "hot coffee", "type": "concept", "order_target": 4}
+    ]
+  },
+  "French|English|Le petit chat noir dort sur le vieux canapé": {
+    "final": "The little black cat sleeps on the old couch",
+    "units": [
+      {"source": "Le petit chat noir", "target": "The little black cat", "type": "concept", "order_target": 0},
+      {"source": "dort", "target": "sleeps", "type": "action", "order_target": 1},
+      {"source": "sur", "target": "on", "type": "connector", "order_target": 2},
+      {"source": "le vieux canapé", "target": "the old couch", "type": "concept", "order_target": 3}
+    ]
+  }
+}
