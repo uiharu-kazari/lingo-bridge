@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { mixRGB } from "/static/app.js?v=20";
+import { mixRGB } from "/static/app.js?v=21";
 
 const col = (mix) => {
   const [r, g, b] = mixRGB(mix);
@@ -82,23 +82,11 @@ export class CardsView {
     this.controls.maxPolarAngle = Math.PI * 0.5;
     this.controls.minDistance = 4.0;
     this.controls.maxDistance = 100.0;
-    this.controls.enableZoom = false; // Disable default zoom scroll to use custom combined scroll
-
-    // Combined scroll handler: mouse wheel adjusts both perspective morph and camera closeness
-    this.renderer.domElement.addEventListener("wheel", (e) => {
-      if (!this.controlsEnabled) return;
-      e.preventDefault();
-      const delta = -e.deltaY * 0.0012; // zoom scroll speed factor
-      
-      // Update target perspective factor
-      this.targetPerspective = Math.max(0, Math.min(1, this.targetPerspective + delta));
-      
-      // Scale radius/closeness target in sync with perspective factor
-      const { minRadius, maxRadius } = this._getRadii();
-      
-      this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - delta * (maxRadius - minRadius) * 0.85));
-      this._updateMorph();
-    }, { passive: false });
+    // Wheel zoom is intentionally OFF so the mouse wheel scrolls the host page
+    // normally (the app is embedded in an iframe on the HF Space — hijacking the
+    // wheel made the stack "keep expanding" on scroll). Zoom/perspective are
+    // driven by the on-screen slider + buttons instead.
+    this.controls.enableZoom = false;
 
     // Bright studio ambient + soft sky/ground hemisphere fill
     this.scene.add(new THREE.AmbientLight(0xffffff, 1.15));

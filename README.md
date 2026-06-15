@@ -9,13 +9,13 @@ pinned: true
 license: apache-2.0
 short_description: Watch & hear a sentence gradually become another language.
 tags:
-  - track:thousand-token-wood
-  - badge:off-brand
-  - badge:tiny-titan
-  - badge:best-demo
-  - badge:bonus-quest-champion
+  - track:wood
   - sponsor:openbmb
   - sponsor:modal
+  - achievement:offbrand
+  - achievement:llama
+  - achievement:tinytitan
+  - achievement:fieldnotes
   - minicpm
   - small-models
   - translation
@@ -30,7 +30,7 @@ Most translators show you a destination. **Lingo Bridge shows you the journey.**
 
 ## 🎬 Demo
 
-▶ **[Demo video](docs/demo.mp4)**  ·  📣 **[Social post](https://x.com/)** _(add link)_
+▶ **[Demo video](docs/demo.mp4)**  ·  📣 **Social posts:** [X/Twitter](https://x.com/auracanvas/status/2066666490871558485) · [Bluesky](https://bsky.app/profile/auracanvas.bsky.social/post/3moehclek7k26)
 
 ![Lingo Bridge](docs/poster.png)
 
@@ -52,12 +52,21 @@ English · Spanish · French · Italian · Portuguese · German · Russian · Ja
 ## 🏆 What we're entered for
 
 - **Track — Thousand Token Wood** (a delightful, AI-native language toy).
-- 🎨 **Off Brand** — a fully custom Three.js UI, far past the default Gradio look, mounted via `gr.mount_gradio_app`.
-- 🐜 **Tiny Titan** — every model is ≤4B (Qwen3-4B + VoxCPM2 2B).
+- 🎨 **Off Brand** (`achievement:offbrand`) — a fully custom Three.js UI, far past the default Gradio look, mounted via `gr.mount_gradio_app`.
+- 🦙 **Llama Champion** (`achievement:llama`) — the text model (Qwen3-4B) runs through the **llama.cpp** runtime.
+- 🐜 **Tiny Titan** (`achievement:tinytitan`) — every model is ≤4B (Qwen3-4B + VoxCPM2 2B).
+- 📓 **Field Notes** (`achievement:fieldnotes`) — see *What I learned* below.
 - 🎬 **Best Demo** — app + demo video + social post.
 - 🏅 **Bonus Quest Champion** — multiple bonus criteria met.
 - **OpenBMB · Best MiniCPM Build** — speech by **VoxCPM2 (MiniCPM-4 backbone)**.
 - **Modal · Best Use of Modal** — Qwen3-4B + VoxCPM2 run on Modal (L4, scale-to-zero); see Architecture.
+
+## 📓 What I learned (field notes)
+
+- **Push structure into Python, not the prompt.** Asking the LLM for the full 7-layer graph produced broken links. Asking for *one* thing — aligned phrase units `{source, target, type, order_target}` — and building the layers deterministically in Python made **every link valid by construction**. The model does the part only a model can; code does the rest.
+- **Small genuinely won on latency.** Qwen3-4B nailed the decomposition across all 10 languages. I tried NVIDIA's Nemotron-9B-v2 for a sponsor prize, but its hybrid-Mamba decode took >120s for a single interactive translation — unusable for a *toy*. The 4B model was both good enough and fast enough.
+- **VoxCPM2 reads mixed-language text directly.** No language tag needed, which is exactly what the hybrid intermediate layers (half source, half target) require — a per-language TTS would have choked on them. Reusing one anchor clip kept the narrator voice consistent across layers.
+- **Thin Space + Modal GPU is the right split.** A free CPU Space serving the custom UI and proxying model calls to a scale-to-zero Modal L4 keeps the Space light and the GPU cheap, while pre-rendering the demo examples (layers **and** audio) makes the toy feel instant even on a cold backend.
 
 ## 🏗️ Architecture
 
@@ -79,6 +88,6 @@ python3 app.py
 - **REQ-01 ≤32B/model** — Qwen3-4B + VoxCPM2 (2B). ✓
 - **REQ-02 Gradio Space in the org** — Docker Space `build-small-hackathon/lingo-bridge`. ✓
 - **REQ-03 Demo video** — [docs/demo.mp4](docs/demo.mp4). ✓
-- **REQ-04 Social post** — _add the link above._ ⬜
+- **REQ-04 Social post** — [X](https://x.com/auracanvas/status/2066666490871558485) · [Bluesky](https://bsky.app/profile/auracanvas.bsky.social/post/3moehclek7k26). ✓
 - **REQ-05 ZeroGPU limit** — n/a (GPU on Modal, not ZeroGPU). ✓
 - **REQ-06 README tags + write-up** — above. ✓
