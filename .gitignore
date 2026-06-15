@@ -15,6 +15,11 @@ package-lock.json
 # Scratch experiments, logs, screenshots (all _-prefixed)
 _*
 
+# Demo recording intermediates (final video lives in docs/demo.mp4)
+video_raw/
+demo_audio.wav
+sil.wav
+
 # AI-tool integration artifacts (not part of the app)
 .claude/
 .agents/

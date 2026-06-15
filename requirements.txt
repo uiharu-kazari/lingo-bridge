@@ -1,13 +1,9 @@
-# Text model (local, llama.cpp). On Apple Silicon install with Metal:
-#   CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python
-llama-cpp-python>=0.3.0
-# TTS (local, Kokoro-82M via onnxruntime)
-kokoro-onnx>=0.4.0
-onnxruntime>=1.17
-soundfile>=0.12
-# Web
+# Thin Gradio Space: serves the UI + proxies model calls to the Modal GPU
+# backend (Qwen3-4B via llama.cpp + OpenBMB VoxCPM2). No models run on the
+# Space, so no llama-cpp-python / torch / voxcpm here — those live in modal_app.py.
+gradio>=5.50,<6
 fastapi>=0.110
 uvicorn>=0.29
 pydantic>=2.0
-huggingface_hub>=0.24
-numpy>=1.24
+huggingface_hub>=0.24,<1.0.0
+numpy>=1.24,<2.0.0
