@@ -86,7 +86,9 @@ def synthesize(text: str, lang_name: str) -> str:
             # No language tag — VoxCPM2 reads mixed-language text directly,
             # which suits the hybrid layers. Reuse one anchor clip so every
             # layer shares the same narrator voice.
-            ref = VOXCPM_REF or _ensure_anchor()
+            # A leading "(...)" is a VoxCPM2 voice-design prompt (e.g. narration
+            # voice) — honor it instead of cloning the anchor.
+            ref = None if text.lstrip().startswith("(") else (VOXCPM_REF or _ensure_anchor())
             try:
                 kwargs = {"text": text, "cfg_value": 2.0, "inference_timesteps": 10}
                 if ref:

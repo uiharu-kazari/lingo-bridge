@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { mixRGB } from "/static/app.js?v=19";
+import { mixRGB } from "/static/app.js?v=20";
 
 const col = (mix) => {
   const [r, g, b] = mixRGB(mix);
@@ -24,6 +24,7 @@ const BLOCK_H = 2.0;       // vertical height (along Z)
 const BLOCK_T = 0.55;      // thickness (along Y)
 const WORLD_W = 26;        // total row width (along X)
 const SOUNDBAR_X = -15.0;  // X position of sound bar to the right of the row
+const FOCUS_X = 15.0;      // X position of focus button to the left of the row
 const SOUNDBAR_W = 2.2;    // sound bar base plate width
 
 export class CardsView {
@@ -46,8 +47,10 @@ export class CardsView {
     this.targetTheta = 0;
     this.targetPan = new THREE.Vector3(0, 0, 0);
     this.panOffset = new THREE.Vector3(0, 0, 0); // horizontal view pan (x,y)
+    this.targetPanOffset = new THREE.Vector3(0, 0, 0); // camera target pan offset
     this.panVel = new THREE.Vector3(0, 0, 0);    // pan momentum (units/frame)
     this.activeLayerIdx = -1;
+    this.activeFocusLayerIdx = -1;
     this._hoveredBlock = null;
     this.controlsEnabled = true;
     
@@ -400,6 +403,55 @@ export class CardsView {
         baseOp: 1.0,
       });
 
+      // Sleek Viewfinder/Focus Button on screen-LEFT (opposite speaker)
+      const fbGeo = new THREE.BoxGeometry(SOUNDBAR_W * 0.7, BLOCK_T * 0.9, BLOCK_H);
+      const fbMat = new THREE.MeshStandardMaterial({ color: 0x1f2330, roughness: 0.6, metalness: 0.4 });
+      const fbMesh = new THREE.Mesh(fbGeo, fbMat);
+      fbMesh.castShadow = true;
+      fbMesh.receiveShadow = true;
+      fbMesh.position.set(FOCUS_X, y, BLOCK_H / 2);
+      fbMesh.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(fbGeo),
+        new THREE.LineBasicMaterial({ color: 0x31384b, transparent: true, opacity: 0.5 })
+      ));
+
+      // Upright metallic bezel ring
+      const bezelGeo = noRay(new THREE.TorusGeometry(0.35, 0.05, 12, 24));
+      const chromeMat = new THREE.MeshStandardMaterial({ color: 0x8a9db8, metalness: 0.9, roughness: 0.15 });
+      const bezel = new THREE.Mesh(bezelGeo, chromeMat);
+      bezel.rotation.x = Math.PI / 2;
+      bezel.position.set(0, frontY + 0.03, 0);
+      fbMesh.add(bezel);
+
+      // Crosshairs targeting lines
+      const hcLine1 = noRay(new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.5), chromeMat));
+      hcLine1.position.set(0, frontY + 0.04, 0);
+      fbMesh.add(hcLine1);
+      const hcLine2 = noRay(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.02, 0.04), chromeMat));
+      hcLine2.position.set(0, frontY + 0.04, 0);
+      fbMesh.add(hcLine2);
+
+      // Central glowing viewfinder reticle dot
+      const dotGeo = noRay(new THREE.SphereGeometry(0.08, 16, 16));
+      const dotMat = new THREE.MeshStandardMaterial({
+        color: layerColor,
+        emissive: layerColor,
+        emissiveIntensity: 0.2,
+        metalness: 0.3,
+        roughness: 0.3
+      });
+      const dot = new THREE.Mesh(dotGeo, dotMat);
+      dot.position.set(0, frontY + 0.06, 0);
+      fbMesh.add(dot);
+
+      this.scene.add(fbMesh);
+      this.blocks.push({
+        mesh: fbMesh, dot,
+        layer: li, isFocusButton: true, isDivider: false,
+        hoverOffset: 0.0, targetHoverOffset: 0.0, playOffset: 0.0, playVelocity: 0.0,
+        baseOp: 1.0,
+      });
+
       const chunks = [...layer.chunks].sort((a, b) => a.pos - b.pos);
       const lens = chunks.map((c) => Math.max(2.2, c.text.length));
       const tot = lens.reduce((a, b) => a + b, 0);
@@ -622,6 +674,7 @@ export class CardsView {
     this.currentTheta = 0; // Reset rotation on new load
     this.targetTheta = 0;
     this.panOffset.set(0, 0, 0); // re-center pan on new load
+    this.targetPanOffset.set(0, 0, 0);
     this.panVel.set(0, 0, 0);
 
     this.targetPan.set(0, 0, 1.0 * this.perspective);
@@ -799,14 +852,14 @@ export class CardsView {
     
     let cursor = "default";
     if (hitBlock) {
-      if (hitBlock.isSoundBar) {
+      if (hitBlock.isSoundBar || hitBlock.isFocusButton) {
         cursor = "pointer";
       } else if (hitBlock.unit != null) {
         cursor = "pointer";
       }
     }
     
-    const unit = (hitBlock && !hitBlock.isSoundBar) ? hitBlock.unit : null;
+    const unit = (hitBlock && !hitBlock.isSoundBar && !hitBlock.isFocusButton) ? hitBlock.unit : null;
     
     if (unit !== this._hovered || hitBlock !== this._hoveredBlock) {
       this._hovered = unit ?? null;
@@ -818,7 +871,7 @@ export class CardsView {
       // feedback loop). It gets an emissive glow instead. Chain siblings on
       // other layers still levitate to show the trace.
       this.blocks.forEach((b) => {
-        if (b.isDivider || b.isSoundBar) { b.targetHoverOffset = 0.0; return; }
+        if (b.isDivider || b.isSoundBar || b.isFocusButton) { b.targetHoverOffset = 0.0; return; }
         if (hitBlock && b === hitBlock) {
           // Stay in place — highlight via emissive boost (applied below)
           b.targetHoverOffset = 0.0;
@@ -855,13 +908,19 @@ export class CardsView {
     const hit = this.raycaster.intersectObjects(activeBlocks.map((b) => b.mesh), false)[0];
     if (hit) {
       const blk = activeBlocks.find((b) => b.mesh === hit.object);
-      if (blk) this.hooks.onPlay(blk.layer);
+      if (blk) {
+        if (blk.isFocusButton) {
+          this.focusLayer(blk.layer);
+        } else {
+          this.hooks.onPlay(blk.layer);
+        }
+      }
     }
   }
 
   setHover(unit) {
     this.blocks.forEach((b) => {
-      if (b.isDivider || b.isSoundBar) return; // speakers unaffected by hover
+      if (b.isDivider || b.isSoundBar || b.isFocusButton) return; // unaffected by hover
       const on = unit == null || b.unit === unit;
       if (b.mesh.material) b.mesh.material.opacity = on ? b.baseOp : 0.45;
       if (b.label) b.label.material.opacity = on ? 1 : 0.5;
@@ -877,6 +936,9 @@ export class CardsView {
 
   highlightLayer(idx) {
     this.activeLayerIdx = idx;
+    if (idx >= 0) {
+      this.focusLayer(idx);
+    }
     this.blocks.forEach((b) => {
       if (b.isDivider) return;
       const on = idx < 0 || b.layer === idx;
@@ -889,6 +951,22 @@ export class CardsView {
         b.playVelocity = 0.08;
       }
     });
+  }
+
+  focusLayer(idx) {
+    if (!this.data) return;
+    const n = this.data.layers.length;
+    if (idx < 0 || idx >= n) return;
+
+    this.activeFocusLayerIdx = idx;
+
+    // Smoothly pan camera target to the focused layer's depth (Y)
+    const y = (idx - (n - 1) / 2) * LAYER_GAP;
+    this.targetPanOffset.y = y;
+
+    // Zoom in closer
+    const { minRadius } = this._getRadii();
+    this.targetCamRadius = minRadius + 11.0; // Zoom in nicely to frame the focused row, keeping it slightly zoomed out per user preference
   }
 
   _resize() {
@@ -949,10 +1027,17 @@ export class CardsView {
       }
     }
     
+    // Smooth panOffset interpolation
+    if (this.panOffset.distanceTo(this.targetPanOffset) > 0.001) {
+      this.panOffset.lerp(this.targetPanOffset, 0.08);
+      this._updateCameraPerspective(this.perspective, true);
+    }
+    
     // Pan momentum: friction decays the velocity so motion eases out smoothly
     // (no abrupt end), while repeated clicks accumulate into continuous glide.
     if (this.panVel.lengthSq() > 1e-5) {
       this.panOffset.addScaledVector(this.panVel, 1);
+      this.targetPanOffset.copy(this.panOffset);
       this.panVel.multiplyScalar(0.90); // friction
       if (this.panVel.lengthSq() < 1e-5) this.panVel.set(0, 0, 0);
       this._updateCameraPerspective(this.perspective, true);
@@ -996,6 +1081,13 @@ export class CardsView {
           const g = isActive ? 1.8 : 0.4;
           b.led.material.emissiveIntensity += (g - b.led.material.emissiveIntensity) * 0.2;
         }
+      }
+
+      // Focus button glowing reticle dot animation
+      if (b.isFocusButton && b.dot) {
+        const isFocused = this.activeFocusLayerIdx === b.layer;
+        const targetGlow = isFocused ? 1.8 : 0.2;
+        b.dot.material.emissiveIntensity += (targetGlow - b.dot.material.emissiveIntensity) * 0.15;
       }
     });
 
