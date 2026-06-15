@@ -145,7 +145,10 @@ const hooks = {
     state.hover = unit;
     state.cards.setHover(unit);
   },
-  onPlay: (layerIdx) => playLayer(layerIdx),
+  onPlay: (layerIdx) => {
+    if (state.playing) stopPlaying();
+    playLayer(layerIdx);
+  },
   onPerspectiveChange: (t) => {
     // Called by CardsView when animating perspective automatically
     const slider = $("#perspective-slider");
@@ -194,6 +197,8 @@ function showLoader(on, msg) {
 
 // ---- audio -----------------------------------------------------------------
 const player = $("#player");
+let currentPlayResolve = null;
+
 function langForLayer(idx) {
   if (!state.data) return "English";
   return idx === 0 ? state.data.source_lang : state.data.target_lang;
@@ -208,6 +213,12 @@ async function ttsUrl(text, lang) {
 }
 async function playLayer(idx) {
   if (!state.data) return;
+  
+  if (currentPlayResolve) {
+    currentPlayResolve();
+    currentPlayResolve = null;
+  }
+  
   const layer = state.data.layers[idx];
   highlightLayer(idx);
   // Precomputed examples ship per-layer audio -> play instantly, no TTS call.
@@ -215,7 +226,9 @@ async function playLayer(idx) {
   player.src = url;
   await player.play().catch(() => {});
   return new Promise((res) => {
+    currentPlayResolve = res;
     player.onended = () => {
+      currentPlayResolve = null;
       if (!state.playing) {
         highlightLayer(-1);
       }
@@ -226,19 +239,39 @@ async function playLayer(idx) {
 function highlightLayer(idx) {
   state.cards.highlightLayer(idx);
 }
+function stopPlaying() {
+  state.playing = false;
+  player.pause();
+  player.src = "";
+  if (currentPlayResolve) {
+    currentPlayResolve();
+    currentPlayResolve = null;
+  }
+  $("#playall").classList.remove("playing");
+  $("#playall").textContent = "▶ Play all layers";
+  highlightLayer(-1);
+}
 async function playAll() {
-  if (!state.data || state.playing) return;
+  if (!state.data) return;
+  if (state.playing) {
+    stopPlaying();
+    return;
+  }
+  
   state.playing = true;
   $("#playall").classList.add("playing");
-  $("#playall").textContent = "■ Playing…";
+  $("#playall").textContent = "■ Stop playing";
   for (let i = 0; i < state.data.layers.length; i++) {
     if (!state.playing) break;
     await playLayer(i);
   }
-  state.playing = false;
-  $("#playall").classList.remove("playing");
-  $("#playall").textContent = "▶ Play all layers";
-  highlightLayer(-1);
+  
+  if (state.playing) {
+    state.playing = false;
+    $("#playall").classList.remove("playing");
+    $("#playall").textContent = "▶ Play all layers";
+    highlightLayer(-1);
+  }
 }
 
 boot();
