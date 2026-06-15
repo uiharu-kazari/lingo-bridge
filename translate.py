@@ -247,7 +247,7 @@ def _remote_translate(text: str, src: str, tgt: str) -> dict:
                 base + "/api/translate", data=payload,
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=300) as r:  # cold start slow
+            with urllib.request.urlopen(req, timeout=15) as r:  # fast fallback if slow
                 return json.load(r)
         except Exception as e:
             last = e
@@ -261,8 +261,12 @@ def progressive_translate(text: str, src: str, tgt: str) -> dict:
     if not text:
         raise ValueError("empty input")
     if llm.REMOTE:
-        return _remote_translate(text, src, tgt)
-    if llm.backend() == "llama":
+        try:
+            return _remote_translate(text, src, tgt)
+        except Exception as e:
+            print(f"[translate] remote translate failed ({e}); falling back to mock")
+            decomp = _mock_decompose(text, src, tgt)
+    elif llm.backend() == "llama":
         try:
             decomp = _decompose(text, src, tgt)
         except Exception as e:

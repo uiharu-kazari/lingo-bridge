@@ -57,6 +57,10 @@ def chat_json(system: str, user: str, max_tokens: int = 1024) -> dict:
     """Run a chat completion that must return a single JSON object."""
     _load()
     if _backend == "llama":
+        # Reasoning models (e.g. Nemotron) need /no_think so they don't emit a
+        # chain-of-thought that breaks the JSON. Harmless for non-thinking models.
+        if os.environ.get("LINGO_LLM_NOTHINK"):
+            system = "/no_think\n" + system
         out = _llm.create_chat_completion(
             messages=[
                 {"role": "system", "content": system},
@@ -73,6 +77,9 @@ def chat_json(system: str, user: str, max_tokens: int = 1024) -> dict:
 
 def _parse_json(text: str) -> dict:
     text = text.strip()
+    # Drop any reasoning block a thinking model may still emit.
+    if "</think>" in text:
+        text = text.split("</think>", 1)[1].strip()
     # Strip code fences if the model added them.
     if text.startswith("```"):
         text = text.split("```", 2)[1]

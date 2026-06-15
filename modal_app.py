@@ -50,6 +50,11 @@ image = (
             "LINGO_STATIC_DIR": "/root/static",
             "LINGO_GPU_LAYERS": "-1",   # offload all LLM layers to the GPU
             "LINGO_LLM_THREADS": "4",
+            # Text model = NVIDIA Nemotron-Nano-9B-v2 (for the NVIDIA prize).
+            # Revert to Qwen by removing these 3 lines (GGUF is already in the Volume).
+            "LINGO_LLM_REPO": "bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF",
+            "LINGO_LLM_FILE": "nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf",
+            "LINGO_LLM_NOTHINK": "1",    # suppress Nemotron chain-of-thought
             "TTS_ENGINE": "voxcpm",      # OpenBMB VoxCPM2 on the GPU
             "HF_HOME": f"{MODELS}/hf",   # cache VoxCPM2 weights in the Volume
             "CC": "gcc", "CXX": "g++",   # for torch.compile (inductor) at runtime
@@ -76,6 +81,12 @@ def download_models():
     hf_hub_download(
         "unsloth/Qwen3-4B-Instruct-2507-GGUF",
         "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        local_dir=MODELS,
+    )
+    print("downloading NVIDIA Nemotron-Nano-9B-v2 Q4_K_M ...")
+    hf_hub_download(
+        "bartowski/nvidia_NVIDIA-Nemotron-Nano-9B-v2-GGUF",
+        "nvidia_NVIDIA-Nemotron-Nano-9B-v2-Q4_K_M.gguf",
         local_dir=MODELS,
     )
     print("caching OpenBMB VoxCPM2 weights into the Volume (HF_HOME) ...")
