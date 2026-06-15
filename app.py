@@ -186,7 +186,7 @@ body, html, gradio-app, .gradio-container {
 }
 iframe {
     width: 100% !important;
-    height: 94vh !important;
+    height: 84vh !important;
     border: none !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -212,7 +212,7 @@ footer a:hover {
 
 with gr.Blocks(title="Lingo Bridge", css=gradio_css) as demo:
     gr.HTML(
-        "<iframe src='/static/index.html' style='width: 100%; height: 94vh; border: none; margin: 0; padding: 0; display: block;'></iframe>"
+        "<iframe src='/static/index.html' style='width: 100%; height: 84vh; border: none; margin: 0; padding: 0; display: block;'></iframe>"
     )
 
 # Mount the Gradio app to the root path "/" of the FastAPI app
