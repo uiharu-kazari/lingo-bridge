@@ -88,6 +88,12 @@ async function boot() {
   $("#btn-rotate-right").onclick = () => {
     state.cards.rotateRight();
   };
+  $("#btn-move-forward").onclick = () => {
+    state.cards.moveForward();
+  };
+  $("#btn-move-backward").onclick = () => {
+    state.cards.moveBackward();
+  };
 
   $("#playall").onclick = playAll;
 }
@@ -155,7 +161,8 @@ async function playLayer(idx) {
   if (!state.data) return;
   const layer = state.data.layers[idx];
   highlightLayer(idx);
-  const url = await ttsUrl(layer.text, langForLayer(idx));
+  // Precomputed examples ship per-layer audio -> play instantly, no TTS call.
+  const url = layer.audio || (await ttsUrl(layer.text, langForLayer(idx)));
   player.src = url;
   await player.play().catch(() => {});
   return new Promise((res) => (player.onended = res));

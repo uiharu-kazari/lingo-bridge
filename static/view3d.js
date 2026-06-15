@@ -27,7 +27,11 @@ export class CardsView {
     this.transitionSpeed = 0.08;
     
     this.camRadius = null;
+    this.targetCamRadius = null;
     this.theta3D = null;
+    this.currentTheta = 0;
+    this.targetTheta = 0;
+    this.targetPan = new THREE.Vector3(0, 0, 0);
     
     this._init();
   }
@@ -71,7 +75,7 @@ export class CardsView {
       const minRadius = Math.max(12, depth * 0.45 + 9.5);
       const maxRadius = minRadius * 1.6;
       
-      this.camRadius = Math.max(minRadius, Math.min(maxRadius, this.camRadius - delta * (maxRadius - minRadius) * 0.85));
+      this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - delta * (maxRadius - minRadius) * 0.85));
       this._updateMorph();
     }, { passive: false });
 
@@ -324,11 +328,14 @@ export class CardsView {
       const gap = 0.5;
       const totGap = gap * (chunks.length - 1);
       const scale = (WORLD_W - totGap) / tot;
-      let x = -WORLD_W / 2;
-      
+      // Lay out from +X toward -X so phrase pos 0 renders on screen-LEFT.
+      // (The camera sits at +Y looking -Y, which maps world -X to screen-right,
+      // so a naive -X..+X layout would read the row backwards.)
+      let x = WORLD_W / 2;
+
       chunks.forEach((ch, i) => {
         const w = Math.max(2.0, lens[i] * scale);
-        const cx = x + w / 2;
+        const cx = x - w / 2;
         const color = col(ch.mix);
         
         // Solid Machined Brushed Anodized Metal Block
@@ -386,7 +393,7 @@ export class CardsView {
         };
         this.blocks.push(rec);
         byId[ch.id] = rec;
-        x += w + gap;
+        x -= w + gap;
       });
     });
 
@@ -513,10 +520,13 @@ export class CardsView {
     const depth = (n - 1) * LAYER_GAP;
     // Radial distance and angled framing (theta3D = 60 degrees from vertical Z)
     this.camRadius = Math.max(15, depth * 0.46 + 11.0);
+    this.targetCamRadius = this.camRadius;
     this.theta3D = 1.05;
     this.currentTheta = 0; // Reset rotation on new load
+    this.targetTheta = 0;
     
-    this.controls.target.set(0, 0, 1.0 * this.perspective);
+    this.targetPan.set(0, 0, 1.0 * this.perspective);
+    this.controls.target.copy(this.targetPan);
   }
 
   _updateCameraPerspective(t, forceUseCurrentTheta = false) {
@@ -532,6 +542,9 @@ export class CardsView {
     if (!forceUseCurrentTheta && t >= 0.01 && Math.sqrt(dx * dx + dy * dy) > 0.1) {
       azimuth = Math.atan2(dx, dy);
       this.currentTheta = azimuth;
+      this.targetTheta = azimuth;
+      this.targetPan.copy(this.controls.target);
+      this.targetCamRadius = this.camera.position.distanceTo(this.controls.target);
     }
     
     if (t < 0.01) {
@@ -597,25 +610,45 @@ export class CardsView {
   }
 
   zoomIn() {
-    this.controls.dollyIn(1.15);
-    this.controls.update();
-    this.camRadius = this.camera.position.distanceTo(this.controls.target);
+    const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
+    const minRadius = Math.max(12, depth * 0.45 + 9.5);
+    const maxRadius = minRadius * 1.6;
+    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - 1.8));
   }
 
   zoomOut() {
-    this.controls.dollyOut(1.15);
-    this.controls.update();
-    this.camRadius = this.camera.position.distanceTo(this.controls.target);
+    const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
+    const minRadius = Math.max(12, depth * 0.45 + 9.5);
+    const maxRadius = minRadius * 1.6;
+    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) + 1.8));
   }
 
   rotateLeft() {
-    this.currentTheta = (this.currentTheta || 0) + 0.15;
-    this._updateMorph(true);
+    this.targetTheta = (this.targetTheta || 0) + 0.3;
   }
 
   rotateRight() {
-    this.currentTheta = (this.currentTheta || 0) - 0.15;
-    this._updateMorph(true);
+    this.targetTheta = (this.targetTheta || 0) - 0.3;
+  }
+
+  moveForward() {
+    this._panCamera(2.2);
+  }
+
+  moveBackward() {
+    this._panCamera(-2.2);
+  }
+
+  _panCamera(d) {
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    dir.z = 0; // horizontal plane only
+    if (dir.lengthSq() < 0.001) {
+      dir.set(0, 1, 0);
+    } else {
+      dir.normalize();
+    }
+    this.targetPan.addScaledVector(dir, d);
   }
 
   // ---- interaction
@@ -722,6 +755,36 @@ export class CardsView {
       morphChanged = true;
       if (this.hooks.onPerspectiveChange) {
         this.hooks.onPerspectiveChange(this.perspective);
+      }
+    }
+    
+    // Smooth rotation interpolation (inertia)
+    if (this.targetTheta !== undefined && this.currentTheta !== undefined) {
+      if (Math.abs(this.targetTheta - this.currentTheta) > 0.001) {
+        this.currentTheta += (this.targetTheta - this.currentTheta) * 0.1;
+        this._updateCameraPerspective(this.perspective, true);
+      } else {
+        this.currentTheta = this.targetTheta;
+      }
+    }
+    
+    // Smooth zoom interpolation (inertia)
+    if (this.targetCamRadius !== null && this.camRadius !== null) {
+      if (Math.abs(this.targetCamRadius - this.camRadius) > 0.01) {
+        this.camRadius += (this.targetCamRadius - this.camRadius) * 0.12;
+        this._updateCameraPerspective(this.perspective, true);
+      } else {
+        this.camRadius = this.targetCamRadius;
+      }
+    }
+    
+    // Smooth panning interpolation (inertia)
+    if (this.targetPan) {
+      if (this.controls.target.distanceTo(this.targetPan) > 0.01) {
+        this.controls.target.lerp(this.targetPan, 0.12);
+        this._updateCameraPerspective(this.perspective, true);
+      } else {
+        this.controls.target.copy(this.targetPan);
       }
     }
     
