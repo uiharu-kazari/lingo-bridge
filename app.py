@@ -178,6 +178,13 @@ body, html, gradio-app, .gradio-container {
     width: 100% !important;
     border: none !important;
 }
+/* Confine to the viewport so the embed can't stretch to its content height
+   when HF nests the Space inside its own auto-sizing wrapper. */
+html, body, gradio-app, .gradio-container {
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+}
 .gradio-container {
     max-width: 100% !important;
     width: 100% !important;
@@ -186,7 +193,8 @@ body, html, gradio-app, .gradio-container {
 }
 iframe {
     width: 100% !important;
-    height: 94vh !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
     border: none !important;
     margin: 0 !important;
     padding: 0 !important;
@@ -212,7 +220,7 @@ footer a:hover {
 
 with gr.Blocks(title="Lingo Bridge", css=gradio_css) as demo:
     gr.HTML(
-        "<iframe src='/static/index.html' style='width: 100%; height: 94vh; border: none; margin: 0; padding: 0; display: block;'></iframe>"
+        "<iframe src='/static/index.html' style='width: 100%; height: 100vh; max-height: 100vh; border: none; margin: 0; padding: 0; display: block;'></iframe>"
     )
 
 # Mount the Gradio app to the root path "/" of the FastAPI app
