@@ -1,17 +1,30 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
-import { mixRGB } from "/static/app.js";
+import { mixRGB } from "/static/app.js?v=18";
 
 const col = (mix) => {
   const [r, g, b] = mixRGB(mix);
   return new THREE.Color(r / 255, g / 255, b / 255);
 };
 
+const UNIT_COLORS = [
+  new THREE.Color(0xa855f7), // Purple
+  new THREE.Color(0x3b82f6), // Blue
+  new THREE.Color(0x1fe0d0), // Cyan/Teal
+  new THREE.Color(0xf59e0b), // Gold
+  new THREE.Color(0x22c55e), // Green
+  new THREE.Color(0xf43f5e), // Pink
+  new THREE.Color(0x6366f1), // Indigo
+  new THREE.Color(0xf97316), // Orange
+];
+
 // world layout constants (Z is now vertical, Y is layer depth, X is horizontal width)
 const LAYER_GAP = 7.0;     // spacing between layers along Y (depth)
 const BLOCK_H = 2.0;       // vertical height (along Z)
 const BLOCK_T = 0.55;      // thickness (along Y)
 const WORLD_W = 26;        // total row width (along X)
+const SOUNDBAR_X = -15.0;  // X position of sound bar to the right of the row
+const SOUNDBAR_W = 2.2;    // sound bar base plate width
 
 export class CardsView {
   constructor(container, hooks) {
@@ -32,6 +45,11 @@ export class CardsView {
     this.currentTheta = 0;
     this.targetTheta = 0;
     this.targetPan = new THREE.Vector3(0, 0, 0);
+    this.panOffset = new THREE.Vector3(0, 0, 0); // horizontal view pan (x,y)
+    this.panVel = new THREE.Vector3(0, 0, 0);    // pan momentum (units/frame)
+    this.activeLayerIdx = -1;
+    this._hoveredBlock = null;
+    this.controlsEnabled = true;
     
     this._init();
   }
@@ -49,7 +67,8 @@ export class CardsView {
     this.c.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x030408, 0.01);
+    this.scene.background = new THREE.Color(0x030408); // dark background
+    this.scene.fog = new THREE.FogExp2(0x030408, 0.0055);
 
     this.camera = new THREE.PerspectiveCamera(42, w / h, 0.1, 400);
     this.camera.up.set(0, 0, 1);
@@ -58,12 +77,13 @@ export class CardsView {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
     this.controls.maxPolarAngle = Math.PI * 0.5;
-    this.controls.minDistance = 12;
-    this.controls.maxDistance = 80;
+    this.controls.minDistance = 4.0;
+    this.controls.maxDistance = 100.0;
     this.controls.enableZoom = false; // Disable default zoom scroll to use custom combined scroll
 
     // Combined scroll handler: mouse wheel adjusts both perspective morph and camera closeness
     this.renderer.domElement.addEventListener("wheel", (e) => {
+      if (!this.controlsEnabled) return;
       e.preventDefault();
       const delta = -e.deltaY * 0.0012; // zoom scroll speed factor
       
@@ -71,19 +91,18 @@ export class CardsView {
       this.targetPerspective = Math.max(0, Math.min(1, this.targetPerspective + delta));
       
       // Scale radius/closeness target in sync with perspective factor
-      const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
-      const minRadius = Math.max(12, depth * 0.45 + 9.5);
-      const maxRadius = minRadius * 1.6;
+      const { minRadius, maxRadius } = this._getRadii();
       
       this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - delta * (maxRadius - minRadius) * 0.85));
       this._updateMorph();
     }, { passive: false });
 
-    // Ambient light - deep tech console baseline
-    this.scene.add(new THREE.AmbientLight(0x1a1c2e, 0.95));
-    
+    // Bright studio ambient + soft sky/ground hemisphere fill
+    this.scene.add(new THREE.AmbientLight(0xffffff, 1.15));
+    this.scene.add(new THREE.HemisphereLight(0xffffff, 0xd7dcea, 0.9));
+
     // Directional Key Light with shadow casting (Z is now vertical high-axis)
-    const k = new THREE.DirectionalLight(0xffffff, 2.0);
+    const k = new THREE.DirectionalLight(0xffffff, 1.7);
     k.position.set(12, 18, 35);
     k.castShadow = true;
     k.shadow.mapSize.width = 2048;
@@ -99,11 +118,11 @@ export class CardsView {
     this.scene.add(k);
 
     // Cyan and Purple accents saved as properties for animated shimmer reflections (Z is vertical)
-    this.p1 = new THREE.PointLight(0xa855f7, 180, 100);
+    this.p1 = new THREE.PointLight(0xa855f7, 70, 100);
     this.p1.position.set(-22, -18, 10);
     this.scene.add(this.p1);
 
-    this.p2 = new THREE.PointLight(0x1fe0d0, 180, 100);
+    this.p2 = new THREE.PointLight(0x1fe0d0, 70, 100);
     this.p2.position.set(22, 18, 10);
     this.scene.add(this.p2);
 
@@ -148,6 +167,7 @@ export class CardsView {
         // Dark ring lines: #20110a (rgb 32, 17, 10)
         // Mid grain: #3a2014 (rgb 58, 32, 20)
         // Golden grain: #4c2c1b (rgb 76, 44, 27)
+        // Rich, warm dark walnut wood tones
         let r, g, b;
         if (val < 0.5) {
           const t = val * 2;
@@ -177,7 +197,7 @@ export class CardsView {
     wCtx.putImageData(imgData, 0, 0);
     
     // Draw fine vertical wood pores/scratches along the Y axis
-    wCtx.strokeStyle = "rgba(18, 10, 5, 0.52)";
+    wCtx.strokeStyle = "rgba(76, 44, 27, 0.22)";
     wCtx.lineWidth = 1.0;
     for (let i = 0; i < 500; i++) {
       const x = Math.random() * 512;
@@ -264,10 +284,10 @@ export class CardsView {
     this.scene.add(desk);
 
     // 2. Faded structure grid overlay rotated flat to X-Y
-    const grid = new THREE.GridHelper(180, 45, 0x1fe0d0, 0x1c100b);
+    const grid = new THREE.GridHelper(180, 45, 0x7d93c4, 0xb9a98c);
     grid.rotation.x = Math.PI / 2; // orient to X-Y plane
     grid.position.z = 0.001;
-    grid.material.opacity = 0.035;
+    grid.material.opacity = 0.06;
     grid.material.transparent = true;
     this.scene.add(grid);
 
@@ -275,8 +295,8 @@ export class CardsView {
     const c = document.createElement("canvas"); c.width = c.height = 512;
     const g = c.getContext("2d");
     const grd = g.createRadialGradient(256, 256, 10, 256, 256, 256);
-    grd.addColorStop(0, "rgba(80,95,170,0.16)");
-    grd.addColorStop(1, "rgba(3,4,8,0)");
+    grd.addColorStop(0, "rgba(255,255,255,0.12)");
+    grd.addColorStop(1, "rgba(255,255,255,0)");
     g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
     const tex = new THREE.CanvasTexture(c);
     const glowPlane = new THREE.Mesh(
@@ -322,6 +342,64 @@ export class CardsView {
 
     layers.forEach((layer, li) => {
       const y = (li - (n - 1) / 2) * LAYER_GAP;        // layer depth along Y
+
+      // Realistic 3D speaker beside each row — CLICK it to play that layer.
+      const layerMix = n > 1 ? li / (n - 1) : 0.0;
+      const layerColor = col(layerMix);
+      const frontY = (BLOCK_T * 0.9) / 2; // local +Y face (toward viewer)
+      const noRay = (m) => { m.raycast = () => {}; return m; };
+
+      // Cabinet (dark, matte — reads as a speaker enclosure on the light desk)
+      const sbGeo = new THREE.BoxGeometry(SOUNDBAR_W, BLOCK_T * 0.9, BLOCK_H);
+      const sbMat = new THREE.MeshStandardMaterial({ color: 0x232838, roughness: 0.55, metalness: 0.5 });
+      const sbMesh = new THREE.Mesh(sbGeo, sbMat);
+      sbMesh.castShadow = true;
+      sbMesh.receiveShadow = true;
+      sbMesh.position.set(SOUNDBAR_X, y, BLOCK_H / 2);
+      sbMesh.add(new THREE.LineSegments(
+        new THREE.EdgesGeometry(sbGeo),
+        new THREE.LineBasicMaterial({ color: 0x3a4256, transparent: true, opacity: 0.5 })
+      ));
+
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0e16, roughness: 0.45, metalness: 0.7 });
+      const coneMat = new THREE.MeshStandardMaterial({ color: layerColor, emissive: layerColor, emissiveIntensity: 0.15, metalness: 0.45, roughness: 0.4 });
+      const domeMat = new THREE.MeshStandardMaterial({ color: layerColor, emissive: layerColor, emissiveIntensity: 0.2, metalness: 0.55, roughness: 0.3 });
+
+      // Woofer: rubber surround (torus) + convex cone + dust cap (lower)
+      const surround = noRay(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.08, 16, 32), darkMat));
+      surround.rotation.x = Math.PI / 2; surround.position.set(0, frontY + 0.02, -0.45);
+      sbMesh.add(surround);
+      const woofer = noRay(new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.18, 32), coneMat));
+      woofer.position.set(0, frontY + 0.10, -0.45); // apex toward +Y (viewer)
+      sbMesh.add(woofer);
+      const cap = noRay(new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), darkMat));
+      cap.position.set(0, frontY + 0.18, -0.45);
+      sbMesh.add(cap);
+
+      // Tweeter (upper): small surround + dome
+      const twRing = noRay(new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 12, 24), darkMat));
+      twRing.rotation.x = Math.PI / 2; twRing.position.set(0, frontY + 0.02, 0.55);
+      sbMesh.add(twRing);
+      const tweeter = noRay(new THREE.Mesh(new THREE.SphereGeometry(0.16, 20, 20), domeMat));
+      tweeter.position.set(0, frontY + 0.05, 0.55);
+      sbMesh.add(tweeter);
+
+      // Status LED (glows while playing)
+      const led = noRay(new THREE.Mesh(
+        new THREE.SphereGeometry(0.055, 12, 12),
+        new THREE.MeshStandardMaterial({ color: layerColor, emissive: layerColor, emissiveIntensity: 0.4 })
+      ));
+      led.position.set(0.72, frontY + 0.03, 0.92);
+      sbMesh.add(led);
+
+      this.scene.add(sbMesh);
+      this.blocks.push({
+        mesh: sbMesh, driver: woofer, tweeter, led,
+        layer: li, isSoundBar: true, isDivider: false,
+        hoverOffset: 0.0, targetHoverOffset: 0.0, playOffset: 0.0, playVelocity: 0.0,
+        baseOp: 1.0,
+      });
+
       const chunks = [...layer.chunks].sort((a, b) => a.pos - b.pos);
       const lens = chunks.map((c) => Math.max(2.2, c.text.length));
       const tot = lens.reduce((a, b) => a + b, 0);
@@ -336,7 +414,7 @@ export class CardsView {
       chunks.forEach((ch, i) => {
         const w = Math.max(2.0, lens[i] * scale);
         const cx = x - w / 2;
-        const color = col(ch.mix);
+        const color = UNIT_COLORS[ch.unit % UNIT_COLORS.length];
         
         // Solid Machined Brushed Anodized Metal Block
         const mat = new THREE.MeshStandardMaterial({
@@ -409,17 +487,26 @@ export class CardsView {
   }
 
   _label(text, w, color) {
-    const PX = 256, ratio = Math.max(1, Math.min(6, w / BLOCK_H));
+    const PX = 256, ratio = Math.max(1, Math.min(12, w / BLOCK_H));
     const cw = Math.round(PX * ratio), ch = PX;
     const cv = document.createElement("canvas"); cv.width = cw; cv.height = ch;
     const g = cv.getContext("2d");
     g.clearRect(0, 0, cw, ch);
-    let fs = 76, t = this._fit(text, 18);
+    
+    let fs = 76;
     g.font = `600 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+    const textWidth = g.measureText(text).width;
+    const maxTextWidth = cw * 0.88;
+    if (textWidth > maxTextWidth) {
+      fs = Math.floor(fs * (maxTextWidth / textWidth));
+      g.font = `600 ${fs}px 'Space Grotesk', system-ui, sans-serif`;
+    }
+    
     g.fillStyle = "rgba(255,255,255,0.96)";
     g.textAlign = "center"; g.textBaseline = "middle";
     g.shadowColor = "rgba(0,0,0,0.6)"; g.shadowBlur = 8;
-    g.fillText(t, cw / 2, ch / 2);
+    g.fillText(text, cw / 2, ch / 2);
+    
     const tex = new THREE.CanvasTexture(cv);
     tex.anisotropy = 4;
     const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
@@ -427,42 +514,47 @@ export class CardsView {
     plane.renderOrder = 1;
     return plane;
   }
-  
-  _fit(t, max) { return t.length > max ? t.slice(0, max - 1) + "…" : t; }
 
+  // Ribbon as a thin metallic FOIL slab: 4 vertices per sample (top/bottom x
+  // left/right) -> top face, bottom face, and two edges give it real thickness.
   _ribbon(a, b, lk) {
     const N = 40;
+    const V = (N + 1) * 4;
     const geo = new THREE.BufferGeometry();
-    const verts = new Float32Array((N + 1) * 6);
-    const cols = new Float32Array((N + 1) * 6);
-    
-    // Interpolated gradient colors along ribbon length
+    const verts = new Float32Array(V * 3);
+    const cols = new Float32Array(V * 3);
+
     const colorA = a.mesh.material.color;
     const colorB = b.mesh.material.color;
     for (let i = 0; i <= N; i++) {
-      const t = i / N;
-      const cc = colorA.clone().lerp(colorB, t);
-      cols[i * 6] = cc.r; cols[i * 6 + 1] = cc.g; cols[i * 6 + 2] = cc.b;
-      cols[i * 6 + 3] = cc.r; cols[i * 6 + 4] = cc.g; cols[i * 6 + 5] = cc.b;
+      const cc = colorA.clone().lerp(colorB, i / N);
+      for (let c = 0; c < 4; c++) {
+        const o = (i * 4 + c) * 3;
+        cols[o] = cc.r; cols[o + 1] = cc.g; cols[o + 2] = cc.b;
+      }
     }
 
     const idx = [];
     for (let i = 0; i < N; i++) {
-      const o = i * 2;
-      idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2);
+      const a0 = i * 4, b0 = (i + 1) * 4; // corners: 0 TL,1 TR,2 BL,3 BR
+      idx.push(a0 + 0, a0 + 1, b0 + 0, a0 + 1, b0 + 1, b0 + 0); // top
+      idx.push(a0 + 2, b0 + 2, a0 + 3, a0 + 3, b0 + 2, b0 + 3); // bottom
+      idx.push(a0 + 0, b0 + 0, a0 + 2, a0 + 2, b0 + 0, b0 + 2); // left edge
+      idx.push(a0 + 1, a0 + 3, b0 + 1, a0 + 3, b0 + 3, b0 + 1); // right edge
     }
 
     geo.setAttribute("position", new THREE.BufferAttribute(verts, 3));
     geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
     geo.setIndex(idx);
 
-    const mat = new THREE.MeshBasicMaterial({
-      vertexColors: true, 
+    const mat = new THREE.MeshStandardMaterial({
+      vertexColors: true,
       transparent: true,
-      opacity: lk.kind === "keep" ? 0.16 : 0.34,
-      side: THREE.DoubleSide, 
+      opacity: lk.kind === "keep" ? 0.5 : 0.8,
+      side: THREE.DoubleSide,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      metalness: 0.9,
+      roughness: 0.3,
     });
 
     const mesh = new THREE.Mesh(geo, mat);
@@ -476,42 +568,46 @@ export class CardsView {
     const up = new THREE.Vector3(0, 0, 1); // vertical axis is Z
     const p0 = new THREE.Vector3();
     const p3 = new THREE.Vector3();
-    
-    // Connection points (previous bottom local -Z to next top local +Z)
+
+    // Precise endpoints: previous-layer card BOTTOM (local -Z) to next-layer
+    // card TOP (local +Z). localToWorld tracks the card's live transform.
     rb.a.mesh.localToWorld(p0.set(0, 0, -BLOCK_H / 2));
     rb.b.mesh.localToWorld(p3.set(0, 0, BLOCK_H / 2));
 
     const dy = p3.y - p0.y;
     const dz = p3.z - p0.z;
-    const c1 = p0.clone().add(new THREE.Vector3(0, dy * 0.25, dz * 0.25));
-    const c2 = p3.clone().add(new THREE.Vector3(0, -dy * 0.25, -dz * 0.25));
-    
+    const lift = 0.6 * t; // gentle elevated arc in 3D, flat in 2D
+    const c1 = p0.clone().add(new THREE.Vector3(0, dy * 0.25, dz * 0.25 + lift));
+    const c2 = p3.clone().add(new THREE.Vector3(0, -dy * 0.25, -dz * 0.25 + lift));
+
     const curve = new THREE.CubicBezierCurve3(p0, c1, c2, p3);
     const N = 40;
-    const hw = Math.min(1.7, 0.7 + Math.abs(p3.x - p0.x) * 0.0 + 0.9);
+    const hw = 1.25;     // foil half-width
+    const halfT = 0.08;  // foil half-thickness
     const pts = curve.getPoints(N);
-    
+
     const geo = rb.mesh.geometry;
     const posAttr = geo.getAttribute("position");
     const verts = posAttr.array;
+    const side = new THREE.Vector3();
+    const nrm = new THREE.Vector3();
 
-    let vIdx = 0;
+    let v = 0;
     for (let i = 0; i <= N; i++) {
-      const currT = i / N;
-      const pt = pts[i].clone();
-      
-      // Add subtle ripple wave along Z (vertical axis)
-      pt.z += Math.sin(currT * Math.PI * 2.0) * 0.28 * t;
-      
-      const tan = curve.getTangent(currT);
-      const side = new THREE.Vector3().crossVectors(up, tan).normalize().multiplyScalar(hw);
-      const L = pt.clone().add(side);
-      const R = pt.clone().sub(side);
-      
-      verts[vIdx++] = L.x; verts[vIdx++] = L.y; verts[vIdx++] = L.z;
-      verts[vIdx++] = R.x; verts[vIdx++] = R.y; verts[vIdx++] = R.z;
+      const pt = pts[i];
+      const tan = curve.getTangent(i / N);
+      side.crossVectors(up, tan).normalize().multiplyScalar(hw);
+      nrm.crossVectors(tan, side).normalize().multiplyScalar(halfT);
+      // corners — 0: +side +nrm
+      verts[v++] = pt.x + side.x + nrm.x; verts[v++] = pt.y + side.y + nrm.y; verts[v++] = pt.z + side.z + nrm.z;
+      // 1: -side +nrm
+      verts[v++] = pt.x - side.x + nrm.x; verts[v++] = pt.y - side.y + nrm.y; verts[v++] = pt.z - side.z + nrm.z;
+      // 2: +side -nrm
+      verts[v++] = pt.x + side.x - nrm.x; verts[v++] = pt.y + side.y - nrm.y; verts[v++] = pt.z + side.z - nrm.z;
+      // 3: -side -nrm
+      verts[v++] = pt.x - side.x - nrm.x; verts[v++] = pt.y - side.y - nrm.y; verts[v++] = pt.z - side.z - nrm.z;
     }
-    
+
     posAttr.needsUpdate = true;
     geo.computeVertexNormals();
   }
@@ -524,9 +620,15 @@ export class CardsView {
     this.theta3D = 1.05;
     this.currentTheta = 0; // Reset rotation on new load
     this.targetTheta = 0;
-    
+    this.panOffset.set(0, 0, 0); // re-center pan on new load
+    this.panVel.set(0, 0, 0);
+
     this.targetPan.set(0, 0, 1.0 * this.perspective);
     this.controls.target.copy(this.targetPan);
+
+    if (this.hooks.onZoomChange) {
+      this.hooks.onZoomChange(this.getZoom());
+    }
   }
 
   _updateCameraPerspective(t, forceUseCurrentTheta = false) {
@@ -550,9 +652,9 @@ export class CardsView {
     if (t < 0.01) {
       // 2D Zenith View: lock controls, set camera overhead, up vector is rotated Y-back
       this.controls.enabled = false;
-      this.camera.position.set(0, 0, this.camRadius);
+      this.camera.position.set(this.panOffset.x, this.panOffset.y, this.camRadius);
       this.camera.up.set(Math.sin(azimuth), -Math.cos(azimuth), 0).normalize();
-      this.controls.target.set(0, 0, 0);
+      this.controls.target.set(this.panOffset.x, this.panOffset.y, 0);
     } else {
       // 3D Perspective View: enable controls, up vector is strictly Z-up
       this.controls.enabled = true;
@@ -561,14 +663,11 @@ export class CardsView {
       const x = this.camRadius * Math.sin(phi) * Math.sin(azimuth);
       const y = this.camRadius * Math.sin(phi) * Math.cos(azimuth);
       const z = this.camRadius * Math.cos(phi);
-      
-      this.camera.position.set(
-        this.controls.target.x + x,
-        this.controls.target.y + y,
-        this.controls.target.z + z
-      );
+
+      const tx = this.panOffset.x, ty = this.panOffset.y, tz = 1.0 * t;
+      this.camera.position.set(tx + x, ty + y, tz + z);
       this.camera.up.set(0, 0, 1);
-      this.controls.target.set(0, 0, 1.0 * t);
+      this.controls.target.set(tx, ty, tz);
       
       // Update OrbitControls limits
       this.controls.enableRotate = true;
@@ -609,18 +708,45 @@ export class CardsView {
     }
   }
 
-  zoomIn() {
+  _getRadii() {
     const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
-    const minRadius = Math.max(12, depth * 0.45 + 9.5);
-    const maxRadius = minRadius * 1.6;
-    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - 1.8));
+    const minRadius = Math.max(4.0, depth * 0.15 + 2.0);
+    const maxRadius = Math.max(28.0, depth * 0.54 + 13.0);
+    return { minRadius, maxRadius };
+  }
+
+  getZoom() {
+    if (this.camRadius === null) return 0.5;
+    const { minRadius, maxRadius } = this._getRadii();
+    const val = (maxRadius - this.camRadius) / (maxRadius - minRadius);
+    return Math.max(0, Math.min(1, val));
+  }
+
+  setZoom(t) {
+    const { minRadius, maxRadius } = this._getRadii();
+    const radius = maxRadius - t * (maxRadius - minRadius);
+    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, radius));
+  }
+
+  zoomIn() {
+    this.zoomStep(0.08);
   }
 
   zoomOut() {
-    const depth = (this.data ? this.data.layers.length : 4) * LAYER_GAP;
-    const minRadius = Math.max(12, depth * 0.45 + 9.5);
-    const maxRadius = minRadius * 1.6;
-    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) + 1.8));
+    this.zoomStep(-0.08);
+  }
+
+  zoomStep(delta) {
+    const { minRadius, maxRadius } = this._getRadii();
+    const step = delta * (maxRadius - minRadius);
+    this.targetCamRadius = Math.max(minRadius, Math.min(maxRadius, (this.targetCamRadius || this.camRadius) - step));
+  }
+
+  setControlsEnabled(enabled) {
+    this.controlsEnabled = enabled;
+    if (this.controls) {
+      this.controls.enabled = enabled && (this.perspective >= 0.01);
+    }
   }
 
   rotateLeft() {
@@ -632,27 +758,33 @@ export class CardsView {
   }
 
   moveForward() {
-    this._panCamera(2.2);
+    this._addPanImpulse(0.25);
   }
 
   moveBackward() {
-    this._panCamera(-2.2);
+    this._addPanImpulse(-0.25);
   }
 
-  _panCamera(d) {
+  // Add velocity along the horizontal view direction. Clicks accumulate; the
+  // friction in _animate eases motion out smoothly (no abrupt stop). Capped so
+  // rapid clicking reaches a steady glide speed rather than flinging away.
+  _addPanImpulse(step) {
     const dir = new THREE.Vector3();
     this.camera.getWorldDirection(dir);
     dir.z = 0; // horizontal plane only
-    if (dir.lengthSq() < 0.001) {
+    if (dir.lengthSq() < 1e-4) {
       dir.set(0, 1, 0);
     } else {
       dir.normalize();
     }
-    this.targetPan.addScaledVector(dir, d);
+    this.panVel.addScaledVector(dir, step);
+    const MAX = 0.5; // units/frame steady-state speed cap
+    if (this.panVel.length() > MAX) this.panVel.setLength(MAX);
   }
 
   // ---- interaction
   _onMove(e) {
+    if (!this.controlsEnabled) return;
     const r = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
     this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
@@ -662,29 +794,56 @@ export class CardsView {
     const activeBlocks = this.blocks.filter(b => !b.isDivider);
     const hit = this.raycaster.intersectObjects(activeBlocks.map((b) => b.mesh), false)[0];
     const hitBlock = hit ? activeBlocks.find((b) => b.mesh === hit.object) : null;
-    const unit = hitBlock ? hitBlock.unit : null;
     
-    if (unit !== this._hovered) {
+    let cursor = "default";
+    if (hitBlock) {
+      if (hitBlock.isSoundBar) {
+        cursor = "pointer";
+      } else if (hitBlock.unit != null) {
+        cursor = "pointer";
+      }
+    }
+    
+    const unit = (hitBlock && !hitBlock.isSoundBar) ? hitBlock.unit : null;
+    
+    if (unit !== this._hovered || hitBlock !== this._hoveredBlock) {
       this._hovered = unit ?? null;
+      this._hoveredBlock = hitBlock;
       this.hooks.onHover(this._hovered);
-      this.renderer.domElement.style.cursor = unit != null ? "pointer" : "default";
       
-      // Word Chain Levitation physics wave
+      // Word-chain levitation — phrase blocks only; speakers never lift on hover.
+      // The directly-hovered block does NOT lift (avoids cursor-leave → jitter
+      // feedback loop). It gets an emissive glow instead. Chain siblings on
+      // other layers still levitate to show the trace.
       this.blocks.forEach((b) => {
-        if (b.isDivider) return;
+        if (b.isDivider || b.isSoundBar) { b.targetHoverOffset = 0.0; return; }
         if (hitBlock && b === hitBlock) {
-          b.targetHoverOffset = 0.75;
+          // Stay in place — highlight via emissive boost (applied below)
+          b.targetHoverOffset = 0.0;
         } else if (unit != null && b.unit === unit) {
           b.targetHoverOffset = 0.35;
         } else {
           b.targetHoverOffset = 0.0;
         }
+        // Emissive glow: bright on the direct hit, medium on chain siblings, restore otherwise
+        const baseEmissive = b.baseEmissiveIntensity ?? b.mesh.material.emissive?.clone();
+        if (!b.baseEmissiveIntensity && b.mesh.material.emissive) {
+          b.baseEmissiveIntensity = b.mesh.material.emissiveIntensity || 0.08;
+        }
+        if (hitBlock && b === hitBlock) {
+          b.targetEmissive = 0.55;
+        } else if (unit != null && b.unit === unit) {
+          b.targetEmissive = 0.3;
+        } else {
+          b.targetEmissive = b.baseEmissiveIntensity ?? 0.08;
+        }
       });
     }
+    this.renderer.domElement.style.cursor = cursor;
   }
 
   _onClick(e) {
-    if (this._hovered == null) return;
+    if (!this.controlsEnabled) return;
     const r = this.renderer.domElement.getBoundingClientRect();
     this.pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
     this.pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
@@ -700,18 +859,22 @@ export class CardsView {
 
   setHover(unit) {
     this.blocks.forEach((b) => {
-      if (b.isDivider) return;
+      if (b.isDivider || b.isSoundBar) return; // speakers unaffected by hover
       const on = unit == null || b.unit === unit;
-      b.mesh.material.opacity = on ? b.baseOp : 0.08;
-      b.label.material.opacity = on ? 1 : 0.12;
+      if (b.mesh.material) b.mesh.material.opacity = on ? b.baseOp : 0.45;
+      if (b.label) b.label.material.opacity = on ? 1 : 0.5;
     });
     this.ribbons.forEach((rb) => {
-      const on = unit == null || rb.unit === unit;
-      rb.mesh.material.opacity = on ? (unit != null && rb.unit === unit ? 0.6 : rb.mesh.userData.baseOp) : 0.04;
+      const u = rb.lk ? rb.lk.unit : undefined;
+      const on = unit == null || u === unit;
+      rb.mesh.material.opacity = on
+        ? (unit != null && u === unit ? 0.95 : rb.mesh.userData.baseOp)
+        : 0.2;
     });
   }
 
   highlightLayer(idx) {
+    this.activeLayerIdx = idx;
     this.blocks.forEach((b) => {
       if (b.isDivider) return;
       const on = idx < 0 || b.layer === idx;
@@ -773,34 +936,65 @@ export class CardsView {
       if (Math.abs(this.targetCamRadius - this.camRadius) > 0.01) {
         this.camRadius += (this.targetCamRadius - this.camRadius) * 0.12;
         this._updateCameraPerspective(this.perspective, true);
+        if (this.hooks.onZoomChange) {
+          this.hooks.onZoomChange(this.getZoom());
+        }
       } else {
         this.camRadius = this.targetCamRadius;
+        if (this.hooks.onZoomChange) {
+          this.hooks.onZoomChange(this.getZoom());
+        }
       }
     }
     
-    // Smooth panning interpolation (inertia)
-    if (this.targetPan) {
-      if (this.controls.target.distanceTo(this.targetPan) > 0.01) {
-        this.controls.target.lerp(this.targetPan, 0.12);
-        this._updateCameraPerspective(this.perspective, true);
-      } else {
-        this.controls.target.copy(this.targetPan);
-      }
+    // Pan momentum: friction decays the velocity so motion eases out smoothly
+    // (no abrupt end), while repeated clicks accumulate into continuous glide.
+    if (this.panVel.lengthSq() > 1e-5) {
+      this.panOffset.addScaledVector(this.panVel, 1);
+      this.panVel.multiplyScalar(0.90); // friction
+      if (this.panVel.lengthSq() < 1e-5) this.panVel.set(0, 0, 0);
+      this._updateCameraPerspective(this.perspective, true);
     }
     
     // 3. Update active spring physics (levitation and playback click-bounce in Z)
     const kSpring = 0.16;
     const dSpring = 0.80;
+    const time = Date.now() * 0.001;
     this.blocks.forEach((b) => {
       if (b.isDivider) return;
       
       // Hover spring (smoothing)
       b.hoverOffset += (b.targetHoverOffset - b.hoverOffset) * 0.14;
       
+      // Emissive glow spring (smoothing) — drives the hover highlight
+      if (b.targetEmissive !== undefined && b.mesh.material.emissiveIntensity !== undefined) {
+        b.mesh.material.emissiveIntensity += (b.targetEmissive - b.mesh.material.emissiveIntensity) * 0.15;
+      }
+      
       // Play dip spring (damped harmonic oscillation)
       const force = -kSpring * b.playOffset;
       b.playVelocity = (b.playVelocity + force) * dSpring;
       b.playOffset += b.playVelocity;
+
+      // Speaker comes alive only while its layer is PLAYING (no hover effect):
+      // the woofer cone pumps and the driver + LED glow.
+      if (b.isSoundBar) {
+        const isActive = this.activeLayerIdx === b.layer;
+        if (b.driver) {
+          const pump = isActive ? 1 + 0.22 * Math.abs(Math.sin(time * 9)) : 1;
+          b.driver.scale.set(1, pump, 1);
+          const g = isActive ? 0.6 : 0.15;
+          b.driver.material.emissiveIntensity += (g - b.driver.material.emissiveIntensity) * 0.2;
+        }
+        if (b.tweeter) {
+          const g = isActive ? 0.6 : 0.2;
+          b.tweeter.material.emissiveIntensity += (g - b.tweeter.material.emissiveIntensity) * 0.2;
+        }
+        if (b.led) {
+          const g = isActive ? 1.8 : 0.4;
+          b.led.material.emissiveIntensity += (g - b.led.material.emissiveIntensity) * 0.2;
+        }
+      }
     });
 
     // 4. Always update positions/geometries to render animations in real-time

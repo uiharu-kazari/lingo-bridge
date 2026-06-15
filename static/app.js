@@ -1,4 +1,4 @@
-import { CardsView } from "/static/view3d.js";
+import { CardsView } from "/static/view3d.js?v=18";
 
 // ---- shared colour helpers (purple -> cyan) --------------------------------
 export const SRC_RGB = [168, 85, 247];
@@ -35,6 +35,7 @@ async function boot() {
   tgt.value = st.languages.includes("Spanish") ? "Spanish" : st.languages[1];
 
   state.cards = new CardsView($("#view-cards"), hooks);
+  window.__cards = state.cards; // debug hook for layout inspection
 
   $("#go").onclick = run;
   $("#input").addEventListener("keydown", (e) => {
@@ -55,6 +56,7 @@ async function boot() {
         src.value = result.source_lang;
         tgt.value = result.target_lang;
         $("#hint").classList.add("hidden");
+        updateControlsState();
         state.data = result;
         state.cards.render(result);
       } else if (data.example) {
@@ -76,6 +78,11 @@ async function boot() {
   };
 
 
+  const zoomSlider = $("#zoom-slider");
+  zoomSlider.oninput = (e) => {
+    const val = parseFloat(e.target.value);
+    state.cards.setZoom(val);
+  };
   $("#btn-zoom-in").onclick = () => {
     state.cards.zoomIn();
   };
@@ -96,6 +103,41 @@ async function boot() {
   };
 
   $("#playall").onclick = playAll;
+  updateControlsState();
+}
+
+function updateControlsState() {
+  const isWelcome = !$("#hint").classList.contains("hidden");
+  
+  if (state.cards) {
+    state.cards.setControlsEnabled(!isWelcome);
+  }
+  
+  const pSlider = $("#perspective-slider");
+  if (pSlider) pSlider.disabled = isWelcome;
+  
+  const playAllBtn = $("#playall");
+  if (playAllBtn) playAllBtn.disabled = isWelcome;
+
+  const zoomSlider = $("#zoom-slider");
+  if (zoomSlider) zoomSlider.disabled = isWelcome;
+
+  document.querySelectorAll(".zoom-controls button").forEach((btn) => {
+    btn.disabled = isWelcome;
+  });
+  
+  const pControl = $(".perspective-control");
+  const zoomControls = $(".zoom-controls");
+  
+  if (isWelcome) {
+    if (pControl) { pControl.style.opacity = "0.35"; pControl.style.pointerEvents = "none"; }
+    if (playAllBtn) { playAllBtn.style.opacity = "0.35"; playAllBtn.style.pointerEvents = "none"; }
+    if (zoomControls) { zoomControls.style.opacity = "0.25"; zoomControls.style.pointerEvents = "none"; }
+  } else {
+    if (pControl) { pControl.style.opacity = "1"; pControl.style.pointerEvents = "auto"; }
+    if (playAllBtn) { playAllBtn.style.opacity = "1"; playAllBtn.style.pointerEvents = "auto"; }
+    if (zoomControls) { zoomControls.style.opacity = "1"; zoomControls.style.pointerEvents = "auto"; }
+  }
 }
 
 const hooks = {
@@ -108,6 +150,12 @@ const hooks = {
     // Called by CardsView when animating perspective automatically
     const slider = $("#perspective-slider");
     slider.value = t;
+  },
+  onZoomChange: (t) => {
+    const zoomSlider = $("#zoom-slider");
+    if (zoomSlider) {
+      zoomSlider.value = t;
+    }
   }
 };
 
@@ -115,6 +163,7 @@ async function run() {
   const text = $("#input").value.trim();
   if (!text) return;
   $("#hint").classList.add("hidden");
+  updateControlsState();
   showLoader(true, "Decomposing & aligning phrases…");
   try {
     const data = await fetch("/api/translate", {
@@ -165,7 +214,14 @@ async function playLayer(idx) {
   const url = layer.audio || (await ttsUrl(layer.text, langForLayer(idx)));
   player.src = url;
   await player.play().catch(() => {});
-  return new Promise((res) => (player.onended = res));
+  return new Promise((res) => {
+    player.onended = () => {
+      if (!state.playing) {
+        highlightLayer(-1);
+      }
+      res();
+    };
+  });
 }
 function highlightLayer(idx) {
   state.cards.highlightLayer(idx);

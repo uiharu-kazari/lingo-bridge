@@ -3,21 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Lingua Stack — Watch a sentence become another language</title>
+  <title>Lingo Bridge — Watch a sentence become another language</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/static/style.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%E2%97%B3%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/static/style.css?v=18" />
+  <link rel="icon" type="image/svg+xml" href="/static/logo.svg" />
 </head>
 <body>
   <div id="bg-glow"></div>
 
   <header class="topbar">
     <div class="brand">
-      <span class="logo">◳</span>
+      <img src="/static/logo.svg" class="logo-img" alt="Lingo Bridge Logo" />
       <div>
-        <h1>Lingua&nbsp;Stack</h1>
+        <h1>Lingo&nbsp;Bridge</h1>
         <p class="tag">Watch &amp; hear a sentence gradually become another language.</p>
       </div>
     </div>
@@ -42,11 +42,6 @@
         <input type="range" id="perspective-slider" min="0" max="1" step="0.001" value="1" aria-label="Perspective Morph" />
         <span class="lbl">3D</span>
       </div>
-      <div class="legend">
-        <span><i class="sw src"></i> source</span>
-        <span><i class="sw mix"></i> mixing</span>
-        <span><i class="sw tgt"></i> target</span>
-      </div>
       <button id="playall" class="playall" title="Play every layer in sequence">▶ Play all layers</button>
     </div>
   </section>
@@ -58,8 +53,24 @@
     
     <!-- Floating Zoom & Rotation Widget -->
     <div class="zoom-controls">
-      <button id="btn-zoom-in" class="zoom-btn" title="Zoom In">+</button>
-      <button id="btn-zoom-out" class="zoom-btn" title="Zoom Out">−</button>
+      <div class="zoom-slider-wrap" title="Magnification (Zoom)">
+        <button id="btn-zoom-in" class="zoom-btn" title="Zoom In (Magnification)" style="display: flex; align-items: center; justify-content: center; padding: 2px; height: 20px; width: 20px; border-radius: 3px; border: none; background: transparent; cursor: pointer; color: var(--muted); transition: color 0.15s;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.85;">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+        <input type="range" id="zoom-slider" min="0" max="1" step="0.001" value="0.5" class="zoom-slider" aria-label="Magnification Slider" />
+        <button id="btn-zoom-out" class="zoom-btn" title="Zoom Out (Magnification)" style="display: flex; align-items: center; justify-content: center; padding: 2px; height: 20px; width: 20px; border-radius: 3px; border: none; background: transparent; cursor: pointer; color: var(--muted); transition: color 0.15s;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.85;">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+        </button>
+      </div>
       <div style="height: 1px; background: rgba(150, 170, 255, 0.15); margin: 4px 0;"></div>
       <button id="btn-rotate-left" class="zoom-btn" title="Rotate Left" style="display: flex; align-items: center; justify-content: center; padding: 2px;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.85;">
@@ -84,23 +95,52 @@
         </svg>
       </button>
       <div style="height: 1px; background: rgba(150, 170, 255, 0.15); margin: 4px 0;"></div>
-      <button id="btn-move-forward" class="zoom-btn" title="Move Forward (Horizontal)" style="display: flex; align-items: center; justify-content: center; padding: 2px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.85;">
-          <line x1="12" y1="19" x2="12" y2="5" />
-          <polyline points="5 12 12 5 19 12" />
+      <button id="btn-move-forward" class="zoom-btn" title="Move Forward (Push In)" style="display: flex; align-items: center; justify-content: center; padding: 2px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="none" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.85;">
+          <!-- 3D Tapered Arrow pointing Up/Away (Move Forward) - Wide Observable Wings -->
+          <!-- Thickness / Shadow Faces -->
+          <polygon points="6.5,17.5 17.5,17.5 17.5,20 6.5,20" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <polygon points="5.5,8.5 10,8.5 10,10.5 5.5,10.5" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <polygon points="14,8.5 18.5,8.5 18.5,10.5 14,10.5" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <!-- Main Front Face -->
+          <polygon points="6.5,17.5 17.5,17.5 14,8.5 18.5,8.5 12,4 5.5,8.5 10,8.5" fill="currentColor" fill-opacity="0.95" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
         </svg>
       </button>
-      <button id="btn-move-backward" class="zoom-btn" title="Move Backward (Horizontal)" style="display: flex; align-items: center; justify-content: center; padding: 2px;">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.85;">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <polyline points="19 12 12 19 5 12" />
+      <button id="btn-move-backward" class="zoom-btn" title="Move Backward (Push Out)" style="display: flex; align-items: center; justify-content: center; padding: 2px;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="none" xmlns="http://www.w3.org/2000/svg" style="opacity: 0.85;">
+          <!-- 3D Tapered Arrow pointing Down/Towards (Move Backward) - Wide Observable Wings -->
+          <!-- Thickness / Shadow Faces -->
+          <polygon points="6.5,6.5 17.5,6.5 17.5,4 6.5,4" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <polygon points="5.5,15.5 10,15.5 10,13.5 5.5,13.5" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <polygon points="14,15.5 18.5,15.5 18.5,13.5 14,13.5" fill="currentColor" fill-opacity="0.5" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
+          <!-- Main Front Face -->
+          <polygon points="6.5,6.5 17.5,6.5 14,15.5 18.5,15.5 12,20 5.5,15.5 10,15.5" fill="currentColor" fill-opacity="0.95" stroke="var(--bg)" stroke-width="0.8" stroke-linejoin="round" />
         </svg>
       </button>
     </div>
     
     <div id="loader" class="loader hidden"><div class="spin"></div><span id="loadmsg">Thinking…</span></div>
-    <div id="hint" class="hint">Enter a sentence and press <b>Translate</b>. Each row is a stage of the
-      transformation — back is the original, front is the final translation. Hover a phrase to trace its flow.</div>
+    <div id="hint" class="hint">
+      <div class="hint-icon-wrap">
+        <img src="/static/logo.svg" class="hint-logo" alt="Lingo Bridge Logo" />
+      </div>
+      <h2>Welcome to Lingo Bridge</h2>
+      <p class="hint-tagline">An interactive toy exploring the migration of language, grammar, and word order.</p>
+      <div class="hint-steps">
+        <div class="hint-step">
+          <span class="step-num">1</span>
+          <p>Type a sentence above or click <b>🎲 Surprise me</b></p>
+        </div>
+        <div class="hint-step">
+          <span class="step-num">2</span>
+          <p>Click <b>Translate →</b> to decompose it into 7 layered steps</p>
+        </div>
+        <div class="hint-step">
+          <span class="step-num">3</span>
+          <p>Hover over phrases to trace the path, or click <b>▶ Play</b> to hear them</p>
+        </div>
+      </div>
+    </div>
   </main>
 
   <audio id="player"></audio>
@@ -111,6 +151,6 @@
       "three/addons/controls/OrbitControls.js": "/static/vendor/OrbitControls.js"
   }}
   </script>
-  <script src="/static/app.js" type="module"></script>
+  <script src="/static/app.js?v=18" type="module"></script>
 </body>
 </html>
