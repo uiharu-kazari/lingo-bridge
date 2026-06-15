@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**Lingua Stack** is a *Progressive Translation Card Stack* built for the Hugging
+**Lingo Bridge** is a *Progressive Translation Card Stack* built for the Hugging
 Face "Build Small Hackathon". It turns a single sentence into a visible **and
 audible** 7-layer progressive translation: the source language gradually becomes
 the target language, one phrase-type at a time. The result is shown as an
@@ -29,7 +29,7 @@ truth (the code still carries some stale comments, e.g. older model names).
   via `kokoro-onnx` (Apache-2.0, torch-free), pluggable via env `TTS_ENGINE`.
 - **Frontend:** fully custom **WebGL** (Three.js, vendored locally) 3D card
   stack + a 2D parallel-sets (SVG) view. Lives under `static/`.
-- **Deployment:** **Modal.com** (serverless GPU), app name `lingua-stack`,
+- **Deployment:** **Modal.com** (serverless GPU), app name `lingo-bridge`,
   file `modal_app.py`. Models live in a Modal Volume `lingua-models`.
 
 ## Project Conventions
@@ -39,9 +39,9 @@ truth (the code still carries some stale comments, e.g. older model names).
 - Small, single-responsibility modules at repo root: `config.py`, `llm.py`,
   `translate.py`, `tts.py`, `examples.py`, `app.py`, `modal_app.py`.
 - All configuration is env-driven through `config.py`
-  (`LINGUA_MODELS_DIR`, `LINGUA_AUDIO_DIR`, `LINGUA_STATIC_DIR`,
-  `LINGUA_LLM_REPO`/`LINGUA_LLM_FILE`, `LINGUA_LLM_THREADS`,
-  `LINGUA_GPU_LAYERS`, `TTS_ENGINE`).
+  (`LINGO_MODELS_DIR`, `LINGO_AUDIO_DIR`, `LINGO_STATIC_DIR`,
+  `LINGO_LLM_REPO`/`LINGO_LLM_FILE`, `LINGO_LLM_THREADS`,
+  `LINGO_GPU_LAYERS`, `TTS_ENGINE`).
 - Keep LLM JSON simple and **validate model output before rendering**.
 - Every backend that can fail has a graceful fallback (mock LLM, beep/silence
   TTS) so the app and frontend always work.
@@ -103,4 +103,4 @@ truth (the code still carries some stale comments, e.g. older model names).
   index, `kokoro-onnx` + onnxruntime, `qwen-tts` (pins `transformers==4.57.3`,
   `accelerate==1.12.0`; optional flash-attn), Three.js (vendored locally under
   `static/vendor/three`), Modal.com.
-- Live URL: https://uiharu-kazari--lingua-stack-web.modal.run
+- Live URL: https://uiharu-kazari--lingo-bridge-web.modal.run

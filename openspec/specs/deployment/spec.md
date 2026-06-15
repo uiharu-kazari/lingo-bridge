@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Deploy Lingua Stack to serverless GPU infrastructure with strict cost controls
+Deploy Lingo Bridge to serverless GPU infrastructure with strict cost controls
 suitable for a hackathon dev budget, while supporting the GPU features the
 target models need.
 
@@ -10,7 +10,7 @@ target models need.
 
 ### Requirement: Modal serverless deployment
 
-The system SHALL deploy on Modal.com as app `lingua-stack` (file
+The system SHALL deploy on Modal.com as app `lingo-bridge` (file
 `modal_app.py`), serving the FastAPI app as an ASGI app, with model weights
 stored in a Modal Volume named `lingua-models`.
 
@@ -20,7 +20,7 @@ stored in a Modal Volume named `lingua-models`.
 - **THEN** the FastAPI app is served as an ASGI web endpoint backed by the
   `lingua-models` Volume
 - **AND** it is reachable at the live URL
-  `https://uiharu-kazari--lingua-stack-web.modal.run`
+  `https://uiharu-kazari--lingo-bridge-web.modal.run`
 
 ### Requirement: Cost guards
 

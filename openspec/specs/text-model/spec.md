@@ -60,7 +60,7 @@ environment variables so the same code runs on local Metal and on a Modal GPU.
 
 #### Scenario: Override via environment
 
-- **WHEN** `LINGUA_LLM_REPO`, `LINGUA_LLM_FILE`, `LINGUA_LLM_THREADS`, or
-  `LINGUA_GPU_LAYERS` are set
+- **WHEN** `LINGO_LLM_REPO`, `LINGO_LLM_FILE`, `LINGO_LLM_THREADS`, or
+  `LINGO_GPU_LAYERS` are set
 - **THEN** the model loader uses those values (e.g. `-1` GPU layers offloads all
   layers to the GPU, `0` runs on CPU)

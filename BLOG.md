@@ -1,4 +1,4 @@
-# Field Notes: Building Lingua Stack
+# Field Notes: Building Lingo Bridge
 
 *Building a translator that shows its work — for the Hugging Face Build Small Hackathon.*
 

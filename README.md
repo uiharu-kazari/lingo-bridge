@@ -1,117 +1,121 @@
-# Lingua Stack — Progressive Translation Card Stack
+---
+title: Lingo Bridge
+emoji: 🌉
+colorFrom: purple
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: true
+license: apache-2.0
+short_description: Watch & hear a sentence gradually become another language.
+tags:
+  - track:thousand-token-wood
+  - badge:off-brand
+  - badge:llama-champion
+  - badge:field-notes
+  - sponsor:modal
+  - sponsor:openbmb
+  - tiny-titan
+  - small-models
+  - translation
+  - tts
+---
 
-> Watch **and hear** a sentence gradually become natural speech in another language.
+# 🌉 Lingo Bridge
 
-Lingua Stack is an interactive language *toy* for the
-[Hugging Face Build Small Hackathon](https://huggingface.co/build-small-hackathon).
-Instead of showing only a final translation, it reveals the **seven intermediate
-mixed-language states** a sentence passes through — so you can see meaning,
-grammar, and word order migrate from the source language to the target,
-phrase by phrase.
+> **Watch and hear** a sentence gradually become another language — phrase by phrase, layer by layer.
 
-Everything runs **locally**: a small text model (Qwen2.5-3B via `llama.cpp`) and
-a small TTS model (Kokoro-82M via `onnxruntime`). No cloud APIs.
+Most translators show you a destination. Lingo Bridge shows you the **journey**. It turns one sentence into a **seven-stage transformation** from the source language to the target — meaning crosses first, then actions, then time words, then the grammar glue, and finally the word order rearranges into something natural — rendered as an interactive **3D card stack** and **spoken aloud at every stage**.
 
-![3D card stack](docs/shot_3d.png)
-![2D parallel sets](docs/shot_2d.png)
+It's a language *toy*, not a translator.
 
-## The seven layers
+## 🎬 Demo
 
-| # | Layer | What flips to the target language |
-|---|-------|-----------------------------------|
-| 1 | Original | — (source sentence) |
-| 2 | Concept | nouns / people / things / ideas |
-| 3 | Action / Feeling | verbs / feelings |
-| 4 | Time / Context | when / time expressions |
-| 5 | Grammar Bridge | connectors / grammar words |
-| 6 | Mostly Target | everything else + word-order migration |
-| 7 | Final | the full, natural target sentence |
+▶ **[Demo video](docs/demo.mp4)**  ·  📣 **[Social post](https://x.com/)** _(link me)_
 
-The key rule: **phrases of the same *type* flip together**, so each layer makes
-a semantically/grammatically coherent move — never a random word swap.
+![Lingo Bridge](docs/poster.png)
 
 ## How it works
 
 ```
-sentence ──► [Qwen2.5-3B / llama.cpp] ──► aligned phrase "units"  (1 JSON call)
-                                              │  {source, target, type, order_target}
-                                              ▼
-                         Python builds 7 layers deterministically
-                         · units flip to target by type (schedule)
-                         · word order migrates near the end → crossing ribbons
-                         · links connect the SAME unit across adjacent layers
-                                              ▼
-                    FastAPI  ──►  custom WebGL / SVG frontend
-                                              ▼
-                         [Kokoro-82M / onnxruntime]  speaks each layer
+sentence ─▶ [Qwen3-4B · llama.cpp] ─▶ one JSON call: aligned phrase "units"
+                                          │ {source, target, type, order_target}
+                                          ▼
+                    Python builds 7 layers deterministically
+                    · phrases flip to the target language by TYPE (a schedule)
+                    · word order migrates to the target near the end → crossing ribbons
+                    · the SAME unit is linked across adjacent layers (valid by construction)
+                                          ▼
+            custom WebGL/SVG UI (Three.js)  +  [OpenBMB VoxCPM2] speaks each layer
 ```
 
-A single structured LLM call does the hard part (decompose + align). The seven
-progressive layers and every phrase link are then built in plain Python, which
-keeps the JSON simple and makes **every connection valid by construction**.
+A single structured LLM call does the hard part (decompose + align); the seven progressive layers, colours, and phrase links are built in plain Python, so the JSON stays simple and **every connection is valid by construction**. Endpoint layers always read as the exact source / natural-target sentence — only the middle rearranges. See **[BLOG.md](BLOG.md)** for the full write-up.
 
-See [`BLOG.md`](BLOG.md) for the full write-up (Field Notes).
+## 🧠 Models — each well under the 32B cap
 
-## Frontend
+| Role | Model | Size | Runtime |
+|------|-------|------|---------|
+| Text (decompose + align) | [`Qwen/Qwen3-4B-Instruct-2507`](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507) (Q4_K_M GGUF) | **4B** | **llama.cpp** |
+| Speech (per-layer TTS) | [`openbmb/VoxCPM2`](https://huggingface.co/openbmb/VoxCPM2) | **2B** | `voxcpm` (GPU) |
 
-A fully custom frontend (no default Gradio UI), served straight from FastAPI:
+Both are open-weight and run on a single GPU. The text model was empirically validated (10/10) on the decompose-and-align task across all 10 languages.
 
-- **3D Card Stack** — upright translucent glass-metal phrase blocks receding in
-  depth (original at the back, final at the front), connected by broad elevated
-  ribbons that lift, arc through the air, and land on the next layer. Reordered
-  phrases make crossing curves. Built with Three.js (vendored locally).
-- **2D Parallel Sets** — the same data as flat rows + ribbon bands, easy to read.
-- Gradual **purple → cyan** colorization as phrases cross to the target language.
-- **Hover** any phrase to trace its flow across all seven layers.
-- **▶ per-layer playback** and **Play all layers** (Kokoro TTS).
+## 🌍 Languages (10)
 
-## Run it
+English · Spanish · French · Italian · Portuguese · German · Russian · Japanese · Korean · Chinese — any pair, either direction.
+
+## 🏗️ Architecture
+
+A custom **WebGL/SVG frontend** (no default Gradio widgets) is served by FastAPI and **mounted inside a Gradio Space** via `gr.mount_gradio_app` (Docker). Heavy model work runs on a **Modal L4 GPU** (Qwen3-4B via llama.cpp + VoxCPM2), so the Space stays light and scales to zero. The 🎲 *Surprise me* examples are pre-rendered (layers **and** VoxCPM2 audio baked in), so the demo plays instantly with zero model calls.
+
+## 🏆 Tracks, prizes & badges
+
+- **Track — Thousand Token Wood** (a delightful, original, AI-load-bearing toy).
+- 🎨 **Off-Brand** — fully custom Three.js UI inside a `gr.mount_gradio_app` Space.
+- 🦙 **Llama Champion** — the text model runs through `llama.cpp`.
+- 📓 **Field Notes** — [BLOG.md](BLOG.md).
+- **Modal** sponsor — GPU backend on Modal (scale-to-zero, cost-guarded).
+- **OpenBMB** sponsor — speech by OpenBMB **VoxCPM2**.
+- 🐜 **Tiny Titan** — every model is ≤4B parameters.
+
+## ▶️ Run it
+
+**As deployed (Gradio Space, Docker):** the `Dockerfile` builds the app; on a GPU Space it runs Qwen3-4B + VoxCPM2 directly.
+
+**Locally without a GPU** — proxy all model calls to the Modal deployment (no model runs on your machine):
 
 ```bash
-./setup.sh     # one-time: installs deps + downloads models (~2.5 GB)
-./run.sh       # serves http://127.0.0.1:7860
+pip install -r requirements.txt
+LINGO_REMOTE_URL="https://uiharu-kazari--lingo-bridge-web.modal.run" \
+TTS_ENGINE=remote \
+LINGO_TTS_REMOTE_URL="https://uiharu-kazari--lingo-bridge-web.modal.run" \
+python3 app.py      # http://127.0.0.1:7860
 ```
 
-Requires Python 3.10+. On Apple Silicon, `setup.sh` builds `llama-cpp-python`
-with Metal. If models are missing the app still runs with a deterministic mock
-backend so you can exercise the UI.
+**GPU backend (Modal):**
 
-## Models
+```bash
+modal run   modal_app.py::download_models   # one-time: cache models in a Volume
+modal deploy modal_app.py                    # serve Qwen3-4B + VoxCPM2 on an L4
+```
 
-- **Text:** [`Qwen/Qwen2.5-3B-Instruct-GGUF`](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF)
-  (`q4_k_m`, ~2.1 GB) — strong multilingual instruct model, runs through
-  `llama.cpp` with Metal.
-- **TTS:** [`hexgrad/Kokoro-82M`](https://huggingface.co/hexgrad/Kokoro-82M)
-  via `kokoro-onnx` — Apache-2.0, 8 languages, near real-time on CPU/Apple Silicon.
+## ✅ Submission checklist
 
-### A note on Qwen3-TTS
+- **≤32B per model** — Qwen3-4B (4B) + VoxCPM2 (2B). ✓
+- **Gradio app** — custom UI mounted in a Gradio Space (Docker). ✓
+- **Demo video** — [docs/demo.mp4](docs/demo.mp4). ✓
+- **Social post** — _add link above._ ⬜
+- **ZeroGPU limit** — n/a; GPU runs on Modal, not ZeroGPU. ✓
 
-The brief asked for **Qwen3-TTS-0.6B**. It exists as open weights
-(`Qwen/Qwen3-TTS-12Hz-0.6B-Base`, Apache-2.0) but ships **CUDA-only** inference
-with no Apple-Silicon/MPS path, so it does not run on the M3 this was built on.
-An adapter is wired in [`tts.py`](tts.py) (`TTS_ENGINE=qwen3`, needs an NVIDIA
-GPU + `pip install qwen-tts`); the default engine is Kokoro-82M so playback
-actually works everywhere.
-
-## Hackathon bonus quests
-
-- **Off-Brand** ✅ — custom WebGL/SVG frontend, no default Gradio UI.
-- **Off the Grid** ✅ — all models local (llama.cpp + onnxruntime), no cloud APIs.
-- **Llama Champion** ✅ — the text model runs through `llama.cpp`.
-- **Field Notes** ✅ — [`BLOG.md`](BLOG.md).
-
-## Supported languages
-
-English, Spanish, French, Italian, Portuguese, Japanese, Chinese, Hindi
-(any pair, in either direction).
-
-## Project layout
+## 🗂️ Project layout
 
 ```
-config.py      paths, model ids, language map, layer schedule
-llm.py         llama.cpp wrapper (+ deterministic mock fallback)
-translate.py   decompose+align prompt → build 7 layers + phrase links
-tts.py         Kokoro-82M TTS (+ Qwen3-TTS adapter, + beep fallback)
-app.py         FastAPI: /api/translate, /api/tts, static frontend
-static/        index.html, style.css, app.js, view2d.js, view3d.js, vendor/three
+config.py       paths, model ids, language set, layer schedule
+llm.py          llama.cpp wrapper (+ remote proxy, + mock fallback)
+translate.py    decompose+align → build 7 layers + phrase links (+ remote proxy)
+tts.py          VoxCPM2 (+ remote proxy, + beep fallback)
+examples.py     curated demo sentences      examples_cache.py  precomputed results + audio
+app.py          FastAPI API + Gradio-mounted custom UI
+modal_app.py    Modal L4 GPU deployment
+static/         index.html, style.css, app.js, view3d.js, vendor/three, example_audio/
 ```
