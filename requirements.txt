@@ -1,0 +1,13 @@
+# Text model (local, llama.cpp). On Apple Silicon install with Metal:
+#   CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python
+llama-cpp-python>=0.3.0
+# TTS (local, Kokoro-82M via onnxruntime)
+kokoro-onnx>=0.4.0
+onnxruntime>=1.17
+soundfile>=0.12
+# Web
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.0
+huggingface_hub>=0.24
+numpy>=1.24
