@@ -102,6 +102,9 @@ def download_models():
     scaledown_window=120,
     timeout=900,             # heavier cold start (torch + 4.5GB TTS model)
     max_containers=1,
+    min_containers=1,        # keep one warm worker: no cold start, no 15s-timeout
+                             # mock fallback. BILLS CONTINUOUSLY (~$0.80/hr L4)
+                             # until set back to 0 / `modal app stop lingo-bridge`.
 )
 @modal.concurrent(max_inputs=4)
 @modal.asgi_app()
