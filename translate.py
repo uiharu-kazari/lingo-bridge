@@ -247,7 +247,12 @@ def _remote_translate(text: str, src: str, tgt: str) -> dict:
                 base + "/api/translate", data=payload,
                 headers={"Content-Type": "application/json"},
             )
-            with urllib.request.urlopen(req, timeout=15) as r:  # fast fallback if slow
+            # Generous timeout: a cold Modal container takes ~2-3 min to load
+            # Qwen3-4B + VoxCPM2. A short timeout here meant cold-start calls
+            # silently fell back to the mock (which just reverses the string for
+            # space-less languages like Chinese -> garbage). Wait for the real
+            # result instead. (Matches the TTS remote path's timeout.)
+            with urllib.request.urlopen(req, timeout=300) as r:
                 return json.load(r)
         except Exception as e:
             last = e
