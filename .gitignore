@@ -25,5 +25,8 @@ sil.wav
 .agents/
 skills-lock.json
 
+# Internal handoff notes (kept locally, not for the public repo)
+HANDOFF.md
+
 # OS
 .DS_Store
